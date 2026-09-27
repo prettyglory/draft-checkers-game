@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.5
+          cache: true
+
+      - name: Resolve engine dependencies
+        working-directory: packages/checkers_engine
+        run: dart pub get
+
+      - name: Check engine formatting
+        working-directory: packages/checkers_engine
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze engine
+        working-directory: packages/checkers_engine
+        run: dart analyze --fatal-infos
+
+      - name: Test engine
+        working-directory: packages/checkers_engine
+        run: dart test
+
+      - name: Resolve session dependencies
+        working-directory: packages/game_session
+        run: dart pub get
+
+      - name: Check session formatting
+        working-directory: packages/game_session
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze session package
+        working-directory: packages/game_session
+        run: dart analyze --fatal-infos
+
+      - name: Test session package
+        working-directory: packages/game_session
+        run: dart test
+
+      - name: Resolve client dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Check client formatting
+        working-directory: apps/mobile
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze client
+        working-directory: apps/mobile
+        run: flutter analyze --fatal-infos
+
+      - name: Test client
+        working-directory: apps/mobile
+        run: flutter test
+
