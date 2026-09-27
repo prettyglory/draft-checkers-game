@@ -1,0 +1,14 @@
+.dart_tool/
+.idea/
+.vscode/
+build/
+coverage/
+*.iml
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+**/passwords.yaml
+
