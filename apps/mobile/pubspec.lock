@@ -25,6 +25,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  checkers_engine:
+    dependency: "direct main"
+    description:
+      path: "../../packages/checkers_engine"
+      relative: true
+    source: path
+    version: "0.1.0"
   clock:
     dependency: transitive
     description:
@@ -41,14 +48,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  cupertino_icons:
-    dependency: "direct main"
-    description:
-      name: cupertino_icons
-      sha256: "41e005c33bd814be4d3096aff55b1908d419fde52ca656c8c47719ec745873cd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.9"
   fake_async:
     dependency: transitive
     description:
@@ -75,6 +74,13 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  game_session:
+    dependency: "direct main"
+    description:
+      path: "../../packages/game_session"
+      relative: true
+    source: path
+    version: "0.1.0"
   leak_tracker:
     dependency: transitive
     description:
