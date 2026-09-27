@@ -1,0 +1,12 @@
+name: checkers_engine
+description: Deterministic, UI-independent rules contracts for Draft Game.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.4
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.3
+
