@@ -7,9 +7,9 @@ the UI and from any particular network transport.
 
 ## Current status
 
-Phase 1 (architecture and project foundation) is in progress. Gameplay is not
-advertised as implemented yet; the next milestone after this phase is the
-tested core engine and American Checkers ruleset.
+Phase 1 (architecture and project foundation) is complete. Gameplay is not
+advertised as implemented yet; the next milestone is the tested core engine and
+American Checkers ruleset.
 
 ## Repository layout
 
@@ -47,5 +47,6 @@ dart test packages/game_session
 ```
 
 See [the architecture](docs/architecture.md), [ruleset research](docs/rulesets.md),
-[delivery roadmap](docs/roadmap.md), and [risk register](docs/risks.md).
+[delivery roadmap](docs/roadmap.md), [risk register](docs/risks.md), and
+[Phase 1 report](docs/phase-1-report.md).
 
