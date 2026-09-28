@@ -7,15 +7,16 @@ the UI and from any particular network transport.
 
 ## Current status
 
-Phase 1 (architecture and project foundation) is complete. Gameplay is not
-advertised as implemented yet; the next milestone is the tested core engine and
-American Checkers ruleset.
+Phase 2 (deterministic core engine) is complete. Immutable board transitions,
+canonical state/move serialization, SHA-256 hashes, and validated replay are
+implemented and tested. Gameplay is not advertised as playable yet; the next
+milestone is the complete American Checkers ruleset.
 
 ## Repository layout
 
 ```text
 apps/mobile/                 Flutter client
-packages/checkers_engine/    Pure-Dart game concepts and rules contracts (Phase 1)
+packages/checkers_engine/    Pure-Dart board, state, codecs, replay, and rules API
 packages/game_session/       Shared session and transport contracts (Phase 1)
 docs/                        Architecture, rules research, roadmap, and risks
 ```
@@ -48,5 +49,6 @@ dart test packages/game_session
 
 See [the architecture](docs/architecture.md), [ruleset research](docs/rulesets.md),
 [delivery roadmap](docs/roadmap.md), [risk register](docs/risks.md), and
-[Phase 1 report](docs/phase-1-report.md).
+[Phase 1 report](docs/phase-1-report.md). The completed engine milestone is
+recorded in the [Phase 2 report](docs/phase-2-report.md).
 

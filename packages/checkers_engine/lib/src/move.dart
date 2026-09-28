@@ -33,6 +33,33 @@ final class Move {
         'A piece cannot be captured twice in one move.',
       );
     }
+    if (this.capturedPieceIds.any((id) => id.trim().isEmpty)) {
+      throw ArgumentError.value(
+        this.capturedPieceIds,
+        'capturedPieceIds',
+        'Captured piece ids cannot be empty.',
+      );
+    }
+    if (this.capturedPieceIds.contains(pieceId)) {
+      throw ArgumentError.value(
+        this.capturedPieceIds,
+        'capturedPieceIds',
+        'A moving piece cannot capture itself.',
+      );
+    }
+    if (this.capturedPieceIds.isEmpty && this.path.length != 2) {
+      throw ArgumentError.value(
+        this.path,
+        'path',
+        'A non-capturing move has exactly one landing.',
+      );
+    }
+    if (this.capturedPieceIds.isNotEmpty &&
+        this.capturedPieceIds.length != this.path.length - 1) {
+      throw ArgumentError(
+        'A capturing move needs one captured piece for every landing.',
+      );
+    }
   }
 
   final String id;

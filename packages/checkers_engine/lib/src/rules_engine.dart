@@ -17,7 +17,7 @@ enum MoveRejectionCode {
 final class MoveValidation {
   const MoveValidation.valid() : rejectionCode = null;
 
-  const MoveValidation.invalid(this.rejectionCode);
+  const MoveValidation.invalid(MoveRejectionCode code) : rejectionCode = code;
 
   final MoveRejectionCode? rejectionCode;
 
@@ -34,6 +34,8 @@ abstract interface class RulesEngine {
 
   MoveValidation validateMove(GameState state, Move move);
 
-  /// Returns a new state or throws if [move] was not validated successfully.
+  /// Returns the next revision/ply or throws if [move] is not valid.
+  ///
+  /// Implementations must increment both `revision` and `ply` exactly once.
   GameState applyMove(GameState state, Move move);
 }

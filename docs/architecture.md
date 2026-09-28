@@ -65,15 +65,20 @@ Capture policy -> promotion policy -> win/draw policy
 new GameState + domain events
 ```
 
-Core concepts are `BoardPosition`, `Piece`, `Move`, `GameState`,
+Core concepts are `BoardPosition`, `Piece`, `Board`, `Move`, `GameState`,
 `RulesetDescriptor`, `RulesEngine`, `MoveValidation`, and `GameOutcome`. A move
 stores its complete landing path, not just origin and destination, so ambiguous
-multi-captures can be represented and replayed exactly.
+multi-captures can be represented and replayed exactly. `GameReplayer` sends
+every recorded move back through its rules engine and rejects illegal moves or
+transitions that do not advance revision and ply exactly once.
 
 Ruleset implementations will compose movement, capture-selection, promotion,
 and draw policies. They will not branch on ruleset names inside one large
 validator. State serialization is versioned, canonical, and hashable for
-reconnect checks and deterministic replay.
+reconnect checks and deterministic replay. The position hash excludes piece
+identities and move counters so equivalent positions can be compared for
+repetition. The snapshot hash includes identities, counters, status, and
+outcome so synchronization can detect any authoritative-state drift.
 
 ## One session model for every mode
 

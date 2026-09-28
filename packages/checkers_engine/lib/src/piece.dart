@@ -30,4 +30,17 @@ final class Piece {
       position: position ?? this.position,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is Piece &&
+            id == other.id &&
+            side == other.side &&
+            rank == other.rank &&
+            position == other.position;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, side, rank, position);
 }

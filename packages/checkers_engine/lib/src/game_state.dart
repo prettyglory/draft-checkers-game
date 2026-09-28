@@ -1,4 +1,6 @@
+import 'board.dart';
 import 'piece.dart';
+import 'position_hasher.dart';
 
 enum GameStatus { active, completed }
 
@@ -40,10 +42,10 @@ final class GameState {
     required this.activeSide,
     required this.ply,
     required this.revision,
-    required this.positionHash,
+    String? positionHash,
     this.status = GameStatus.active,
     this.outcome,
-  }) : pieces = List<Piece>.unmodifiable(pieces) {
+  }) : board = Board(size: boardSize, pieces: pieces) {
     if (rulesetId.trim().isEmpty) {
       throw ArgumentError.value(
         rulesetId,
@@ -61,26 +63,20 @@ final class GameState {
     if (ply < 0 || revision < 0) {
       throw ArgumentError('Ply and revision cannot be negative.');
     }
-    if (positionHash.trim().isEmpty) {
+    final computedPositionHash = PositionHasher.compute(
+      rulesetId: rulesetId,
+      boardSize: boardSize,
+      pieces: board.pieces,
+      activeSide: activeSide,
+    );
+    if (positionHash != null && positionHash != computedPositionHash) {
       throw ArgumentError.value(
         positionHash,
         'positionHash',
-        'Position hash cannot be empty.',
+        'Position hash does not match the state.',
       );
     }
-    final ids = <String>{};
-    final occupied = <Object>{};
-    for (final piece in this.pieces) {
-      if (!ids.add(piece.id)) {
-        throw ArgumentError('Duplicate piece id: ${piece.id}.');
-      }
-      if (!piece.position.isInside(boardSize)) {
-        throw ArgumentError('Piece ${piece.id} is outside the board.');
-      }
-      if (!occupied.add(piece.position)) {
-        throw ArgumentError('Multiple pieces occupy ${piece.position}.');
-      }
-    }
+    this.positionHash = computedPositionHash;
     if (status == GameStatus.completed && outcome == null) {
       throw ArgumentError('A completed game must have an outcome.');
     }
@@ -91,11 +87,13 @@ final class GameState {
 
   final String rulesetId;
   final int boardSize;
-  final List<Piece> pieces;
+  final Board board;
   final PlayerSide activeSide;
   final int ply;
   final int revision;
-  final String positionHash;
+  late final String positionHash;
   final GameStatus status;
   final GameOutcome? outcome;
+
+  List<Piece> get pieces => board.pieces;
 }

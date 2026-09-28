@@ -1,8 +1,10 @@
 /// Zero-based board coordinate independent of any display orientation.
 final class BoardPosition {
-  const BoardPosition({required this.row, required this.column})
-    : assert(row >= 0),
-      assert(column >= 0);
+  BoardPosition({required this.row, required this.column}) {
+    if (row < 0 || column < 0) {
+      throw RangeError('Board coordinates cannot be negative.');
+    }
+  }
 
   final int row;
   final int column;
@@ -14,6 +16,10 @@ final class BoardPosition {
         row < boardSize &&
         column >= 0 &&
         column < boardSize;
+  }
+
+  BoardPosition offset({required int rows, required int columns}) {
+    return BoardPosition(row: row + rows, column: column + columns);
   }
 
   @override
