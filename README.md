@@ -14,11 +14,12 @@ ordered updates, and handles resignation and draw agreements. The completed
 Phase 4 board behavior remains covered on phone and tablet. Persistence, clocks,
 undo, and process resume remain for later Phase 5 slices.
 
-Phase 6 has started with a separate pure-Dart AI package. Its first slice
-defines measurable search budgets and metadata, cancellation contracts, and a
-seeded beginner strategy that selects only authoritative legal moves. Advanced
-search, ten difficulty profiles, isolate execution, and device performance
-evidence remain in progress.
+Phase 6 has started with a separate pure-Dart AI package. It now provides
+measurable search budgets and metadata, cancellation contracts, a seeded legal
+beginner strategy, weighted evaluation, fixed-depth alpha-beta, iterative
+deepening, and deterministic tactical move ordering. Ten difficulty profiles,
+transposition storage, isolate execution, and device performance evidence remain
+in progress.
 
 ## Repository layout
 

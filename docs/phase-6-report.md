@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - AI contracts and beginner strategy complete
+Status: In progress - search foundation and tactical ordering complete
 
 ## Documented outcome
 
