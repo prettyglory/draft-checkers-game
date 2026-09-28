@@ -3,8 +3,8 @@
 Every phase ends with updated documentation, formatting/static analysis, tests,
 manual acceptance of the changed flow, and a meaningful commit.
 
-Phases 1-4 are complete. Phase 5 is the next planned milestone and has not
-started.
+Phases 1-4 are complete. Phase 5 is in progress: the authoritative in-process
+session slice is complete, while persistence, clocks, undo, and resume remain.
 
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ started.
 | 2. Core engine | Immutable board/state, move application, serialization, replay/hash | Domain unit tests and property invariants |
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
-| 5. Single player | Game flow, persistence, clocks, undo policy, resume | End-to-end offline game and process-restart test |
+| 5. Single player (in progress) | Authoritative local session complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus 21 Flutter regression/integration tests; end-to-end persistence evidence pending |
 | 6. AI levels | Ten measurable strategies/budgets, isolate worker, cancellation | Tactical suite, legal-move fuzzing, device performance budget |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |

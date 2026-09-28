@@ -7,19 +7,19 @@ the UI and from any particular network transport.
 
 ## Current status
 
-Phase 4 (playable board UI) is complete. The Flutter client presents the WCDF
-American Checkers rules through a responsive, accessible local board with legal
-selection targets, compulsory-capture guidance, complete multi-jump paths,
-promotion and king presentation, light/dark themes, and keyboard operation.
-Phone and tablet layouts are covered by widget, semantics, and golden tests.
-Phase 5, the single-player game flow and persistence milestone, has not started.
+Phase 5 is in progress. Its first slice adds an authoritative in-process
+`GameSession` between the playable board and rules engine. The session validates
+actors and revisions, applies legal commands, deduplicates command IDs, emits
+ordered updates, and handles resignation and draw agreements. The completed
+Phase 4 board behavior remains covered on phone and tablet. Persistence, clocks,
+undo, and process resume remain for later Phase 5 slices.
 
 ## Repository layout
 
 ```text
 apps/mobile/                 Flutter client
 packages/checkers_engine/    Pure-Dart board, state, codecs, replay, and rules API
-packages/game_session/       Shared session and transport contracts (Phase 1)
+packages/game_session/       Session contracts and local authoritative reducer
 docs/                        Architecture, rules research, roadmap, and risks
 ```
 
@@ -55,4 +55,5 @@ See [the architecture](docs/architecture.md), [ruleset research](docs/rulesets.m
 recorded in the [Phase 2 report](docs/phase-2-report.md), and the first playable
 ruleset is documented in the [Phase 3 report](docs/phase-3-report.md). The
 responsive playable board milestone is recorded in the
-[Phase 4 report](docs/phase-4-report.md).
+[Phase 4 report](docs/phase-4-report.md). The authoritative local-session slice
+is documented in the [Phase 5 report](docs/phase-5-report.md).

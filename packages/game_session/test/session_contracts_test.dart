@@ -65,5 +65,18 @@ void main() {
       expect(receipt.committedSequence, 12);
       expect(receipt.rejection, isNull);
     });
+
+    test('represents idempotent rejection explicitly', () {
+      const receipt = CommandReceipt.rejected(
+        commandId: 'command-1',
+        rejection: CommandRejection.staleRevision,
+        duplicate: true,
+      );
+
+      expect(receipt.accepted, isFalse);
+      expect(receipt.duplicate, isTrue);
+      expect(receipt.committedSequence, isNull);
+      expect(receipt.rejection, CommandRejection.staleRevision);
+    });
   });
 }

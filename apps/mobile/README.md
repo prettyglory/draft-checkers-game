@@ -5,9 +5,10 @@ Android, iOS, web, and desktop targets. Phase 4 supports local board interaction
 legal move and capture guidance, complete multi-jump selection, promotion,
 light/dark themes, and keyboard operation.
 
-The board currently owns a local rules-engine view-model. Phase 5 will introduce
-the single-player game flow, persistence, clocks, undo policy, and resume
-behavior; those features are not part of the Phase 4 client.
+The board submits commands through an authoritative in-process `GameSession`.
+The session owns game state, legal moves, actor/revision validation, command
+deduplication, ordered updates, resignation, and draw agreements. Remaining
+Phase 5 work includes persistence, clocks, undo policy, and resume behavior.
 
 ## Run
 

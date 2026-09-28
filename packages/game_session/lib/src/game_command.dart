@@ -55,8 +55,26 @@ final class RespondToDrawCommand extends GameCommand {
     required super.commandId,
     required super.actorId,
     required super.expectedRevision,
+    required this.offerCommandId,
     required this.accepted,
-  });
+  }) {
+    if (offerCommandId.trim().isEmpty) {
+      throw ArgumentError.value(
+        offerCommandId,
+        'offerCommandId',
+        'Offer command id cannot be empty.',
+      );
+    }
+  }
 
+  final String offerCommandId;
   final bool accepted;
+}
+
+final class StartNewGameCommand extends GameCommand {
+  StartNewGameCommand({
+    required super.commandId,
+    required super.actorId,
+    required super.expectedRevision,
+  });
 }

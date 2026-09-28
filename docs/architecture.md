@@ -89,11 +89,13 @@ Every UI uses `GameSession`. It exposes the current state, an ordered update
 stream, command submission, reconnect, and close. The authority changes by mode;
 the view-model does not.
 
-Phase 4 is the temporary exception at the milestone boundary: its local board
-view-model talks directly to `AmericanCheckersRulesEngine` so board interaction
-can be validated before game-flow concerns are introduced. Phase 5 will add the
-in-process `GameSession` integration; no session behavior is implemented by the
-Phase 4 board.
+The Phase 5 in-process implementation is the first concrete authority. It owns
+the rules engine and current state, maps local seat actors to sides, rejects
+unauthorized or stale commands, deduplicates command IDs, and emits one ordered
+update for every accepted action. The board view-model consumes session state
+and legal moves without importing or constructing a rules engine. Draw offers
+are session state rather than board state; resignation and accepted draws create
+terminal `GameState` snapshots without adding a gameplay ply.
 
 | Mode | Authority | Transport/actor |
 | --- | --- | --- |

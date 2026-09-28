@@ -4,6 +4,30 @@ import 'package:checkers_engine/checkers_engine.dart';
 import 'package:draft_game/features/game/presentation/checkers_board.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter/material.dart';
+import 'package:game_session/game_session.dart';
+
+const _darkActorId = 'local-dark';
+const _lightActorId = 'local-light';
+
+GameBoardViewModel _createLocalViewModel(GameState? initialState) {
+  const engine = AmericanCheckersRulesEngine();
+  final session = InProcessGameSession(
+    id: 'local-game',
+    rulesEngine: engine,
+    initialState: initialState ?? engine.createInitialState(),
+    actorSides: const <String, PlayerSide>{
+      _darkActorId: PlayerSide.dark,
+      _lightActorId: PlayerSide.light,
+    },
+  );
+  return GameBoardViewModel(
+    session: session,
+    actorIdsBySide: const <PlayerSide, String>{
+      PlayerSide.dark: _darkActorId,
+      PlayerSide.light: _lightActorId,
+    },
+  );
+}
 
 class GameBoardScreen extends StatefulWidget {
   const GameBoardScreen({this.initialState, this.viewModel, super.key})
@@ -24,9 +48,7 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   void initState() {
     super.initState();
     _ownsViewModel = widget.viewModel == null;
-    _viewModel =
-        widget.viewModel ??
-        GameBoardViewModel(initialState: widget.initialState);
+    _viewModel = widget.viewModel ?? _createLocalViewModel(widget.initialState);
   }
 
   @override

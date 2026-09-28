@@ -1,8 +1,34 @@
 import 'package:checkers_engine/checkers_engine.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:game_session/game_session.dart';
 
 void main() {
+  const engine = AmericanCheckersRulesEngine();
+  const actors = <String, PlayerSide>{
+    'local-dark': PlayerSide.dark,
+    'local-light': PlayerSide.light,
+  };
+
+  InProcessGameSession createSession({GameState? initialState}) {
+    return InProcessGameSession(
+      id: 'view-model-test',
+      rulesEngine: engine,
+      initialState: initialState ?? engine.createInitialState(),
+      actorSides: actors,
+    );
+  }
+
+  GameBoardViewModel createViewModel(InProcessGameSession session) {
+    return GameBoardViewModel(
+      session: session,
+      actorIdsBySide: const <PlayerSide, String>{
+        PlayerSide.dark: 'local-dark',
+        PlayerSide.light: 'local-light',
+      },
+    );
+  }
+
   Piece piece(
     String id,
     PlayerSide side,
@@ -18,11 +44,11 @@ void main() {
     );
   }
 
-  test('selection exposes only engine-approved next landings', () {
-    final viewModel = GameBoardViewModel();
+  test('selection exposes only session-approved next landings', () async {
+    final viewModel = createViewModel(createSession());
     addTearDown(viewModel.dispose);
 
-    viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
 
     expect(viewModel.selectedPieceId, 'dark-09');
     expect(viewModel.targetPositions, <BoardPosition>{
@@ -31,7 +57,7 @@ void main() {
     });
   });
 
-  test('multi-capture previews each step before applying one turn', () {
+  test('multi-capture previews each step before applying one turn', () async {
     final captureState = GameState(
       rulesetId: AmericanCheckersRulesEngine.rulesetId,
       boardSize: 8,
@@ -44,11 +70,13 @@ void main() {
       ply: 0,
       revision: 0,
     );
-    final viewModel = GameBoardViewModel(initialState: captureState);
+    final viewModel = createViewModel(
+      createSession(initialState: captureState),
+    );
     addTearDown(viewModel.dispose);
 
-    viewModel.tapSquare(BoardPosition(row: 2, column: 1));
-    viewModel.tapSquare(BoardPosition(row: 4, column: 3));
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 4, column: 3));
 
     expect(viewModel.state.revision, 0);
     expect(viewModel.isPathInProgress, isTrue);
@@ -60,29 +88,30 @@ void main() {
       BoardPosition(row: 6, column: 1),
     });
 
-    viewModel.tapSquare(BoardPosition(row: 6, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 6, column: 1));
 
     expect(viewModel.state.revision, 1);
     expect(viewModel.state.status, GameStatus.completed);
     expect(viewModel.selectedPieceId, isNull);
+    expect(viewModel.lastCommandReceipt?.accepted, isTrue);
   });
 
-  test('reset restores the WCDF opening state', () {
-    final viewModel = GameBoardViewModel();
+  test('reset restores the WCDF opening state through the session', () async {
+    final viewModel = createViewModel(createSession());
     addTearDown(viewModel.dispose);
-    viewModel.tapSquare(BoardPosition(row: 2, column: 1));
-    viewModel.tapSquare(BoardPosition(row: 3, column: 0));
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 3, column: 0));
     expect(viewModel.state.revision, 1);
 
-    viewModel.reset();
+    await viewModel.reset();
 
-    expect(viewModel.state.revision, 0);
+    expect(viewModel.state.revision, 2);
     expect(viewModel.state.activeSide, PlayerSide.dark);
     expect(viewModel.state.board.pieceCount, 24);
     expect(viewModel.selectedPieceId, isNull);
   });
 
-  test('promotion crowns a man and ends its capture turn', () {
+  test('promotion crowns a man and ends its capture turn', () async {
     final promotionState = GameState(
       rulesetId: AmericanCheckersRulesEngine.rulesetId,
       boardSize: 8,
@@ -95,15 +124,17 @@ void main() {
       ply: 0,
       revision: 0,
     );
-    final viewModel = GameBoardViewModel(initialState: promotionState);
+    final viewModel = createViewModel(
+      createSession(initialState: promotionState),
+    );
     addTearDown(viewModel.dispose);
 
-    viewModel.tapSquare(BoardPosition(row: 5, column: 0));
+    await viewModel.tapSquare(BoardPosition(row: 5, column: 0));
     expect(viewModel.targetPositions, <BoardPosition>{
       BoardPosition(row: 7, column: 2),
     });
 
-    viewModel.tapSquare(BoardPosition(row: 7, column: 2));
+    await viewModel.tapSquare(BoardPosition(row: 7, column: 2));
 
     expect(viewModel.state.revision, 1);
     expect(viewModel.state.activeSide, PlayerSide.light);
@@ -111,7 +142,7 @@ void main() {
     expect(viewModel.state.board.pieceById('light-backward-option'), isNotNull);
   });
 
-  test('king selection exposes backward moves', () {
+  test('king selection exposes backward moves', () async {
     final kingState = GameState(
       rulesetId: AmericanCheckersRulesEngine.rulesetId,
       boardSize: 8,
@@ -123,10 +154,10 @@ void main() {
       ply: 0,
       revision: 0,
     );
-    final viewModel = GameBoardViewModel(initialState: kingState);
+    final viewModel = createViewModel(createSession(initialState: kingState));
     addTearDown(viewModel.dispose);
 
-    viewModel.tapSquare(BoardPosition(row: 4, column: 3));
+    await viewModel.tapSquare(BoardPosition(row: 4, column: 3));
 
     expect(
       viewModel.targetPositions,
@@ -137,4 +168,28 @@ void main() {
       contains(BoardPosition(row: 3, column: 4)),
     );
   });
+
+  test(
+    'reflects authoritative session updates from outside the view model',
+    () async {
+      final session = createSession();
+      final viewModel = createViewModel(session);
+      addTearDown(viewModel.dispose);
+
+      final receipt = await session.submit(
+        ResignCommand(
+          commandId: 'external-resignation',
+          actorId: 'local-light',
+          expectedRevision: 0,
+        ),
+      );
+      await pumpEventQueue();
+
+      expect(receipt.accepted, isTrue);
+      expect(viewModel.state, same(session.currentState));
+      expect(viewModel.state.status, GameStatus.completed);
+      expect(viewModel.statusTitle, 'Dark wins');
+      expect(viewModel.statusDetail, 'The opposing player resigned.');
+    },
+  );
 }

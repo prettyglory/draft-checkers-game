@@ -1,22 +1,41 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:checkers_engine/checkers_engine.dart';
 import 'package:flutter/foundation.dart';
+import 'package:game_session/game_session.dart';
 
 final class GameBoardViewModel extends ChangeNotifier {
   GameBoardViewModel({
-    AmericanCheckersRulesEngine engine = const AmericanCheckersRulesEngine(),
-    GameState? initialState,
-  }) : _engine = engine,
-       _state = initialState ?? engine.createInitialState() {
-    _legalMoves = _engine.legalMoves(_state);
+    required GameSession session,
+    required Map<PlayerSide, String> actorIdsBySide,
+    this.closeSessionOnDispose = true,
+  }) : _session = session,
+       _actorIdsBySide = Map<PlayerSide, String>.unmodifiable(actorIdsBySide),
+       _state = session.currentState,
+       _legalMoves = session.legalMoves {
+    if (actorIdsBySide.length != PlayerSide.values.length ||
+        actorIdsBySide.values.any((actorId) => actorId.trim().isEmpty)) {
+      throw ArgumentError('A non-empty actor id is required for each side.');
+    }
+    _updateSubscription = _session.updates.listen(_handleSessionUpdate);
+    _startFuture = _startSession();
   }
 
-  final AmericanCheckersRulesEngine _engine;
+  final GameSession _session;
+  final Map<PlayerSide, String> _actorIdsBySide;
+  final bool closeSessionOnDispose;
+  late final StreamSubscription<SessionUpdate> _updateSubscription;
+  late final Future<void> _startFuture;
   GameState _state;
-  late List<Move> _legalMoves;
+  List<Move> _legalMoves;
+  CommandReceipt? _lastCommandReceipt;
+  Object? _sessionError;
   String? _selectedPieceId;
   List<BoardPosition> _selectedPath = const <BoardPosition>[];
+  int _commandNumber = 0;
+  bool _submitting = false;
+  bool _disposed = false;
 
   GameState get state => _state;
   String? get selectedPieceId => _selectedPieceId;
@@ -24,6 +43,8 @@ final class GameBoardViewModel extends ChangeNotifier {
       UnmodifiableListView<BoardPosition>(_selectedPath);
 
   List<Move> get legalMoves => _legalMoves;
+  CommandReceipt? get lastCommandReceipt => _lastCommandReceipt;
+  Object? get sessionError => _sessionError;
 
   bool get captureRequired => legalMoves.any((move) => move.isCapture);
 
@@ -72,8 +93,12 @@ final class GameBoardViewModel extends ChangeNotifier {
     );
   }
 
-  void tapSquare(BoardPosition position) {
-    if (_state.status == GameStatus.completed) {
+  Future<void> tapSquare(BoardPosition position) async {
+    await _startFuture;
+    if (_sessionError != null) {
+      return;
+    }
+    if (_state.status == GameStatus.completed || _submitting) {
       return;
     }
 
@@ -90,13 +115,25 @@ final class GameBoardViewModel extends ChangeNotifier {
         (move) => move.path.length == nextPath.length,
       );
       if (completed.isNotEmpty) {
-        _state = _engine.applyMove(_state, completed.first);
-        _legalMoves = _engine.legalMoves(_state);
-        _clearSelection(notify: false);
+        _submitting = true;
+        final side = _state.activeSide;
+        try {
+          _lastCommandReceipt = await _session.submit(
+            SubmitMoveCommand(
+              commandId: _nextCommandId('move'),
+              actorId: _actorIdsBySide[side]!,
+              expectedRevision: _state.revision,
+              move: completed.first,
+            ),
+          );
+        } finally {
+          _submitting = false;
+          _synchronizeFromSession(clearSelection: true);
+        }
       } else {
         _selectedPath = List<BoardPosition>.unmodifiable(nextPath);
+        notifyListeners();
       }
-      notifyListeners();
       return;
     }
 
@@ -117,11 +154,27 @@ final class GameBoardViewModel extends ChangeNotifier {
     _clearSelection();
   }
 
-  void reset() {
-    _state = _engine.createInitialState();
-    _legalMoves = _engine.legalMoves(_state);
-    _clearSelection(notify: false);
-    notifyListeners();
+  Future<void> reset() async {
+    await _startFuture;
+    if (_sessionError != null) {
+      return;
+    }
+    if (_submitting) {
+      return;
+    }
+    _submitting = true;
+    try {
+      _lastCommandReceipt = await _session.submit(
+        StartNewGameCommand(
+          commandId: _nextCommandId('new-game'),
+          actorId: _actorIdsBySide[_state.activeSide]!,
+          expectedRevision: _state.revision,
+        ),
+      );
+    } finally {
+      _submitting = false;
+      _synchronizeFromSession(clearSelection: true);
+    }
   }
 
   String get statusTitle {
@@ -145,6 +198,8 @@ final class GameBoardViewModel extends ChangeNotifier {
           'The same position occurred three times.',
         GameOutcomeReason.moveLimit =>
           'Forty moves per side passed without progress.',
+        GameOutcomeReason.resignation => 'The opposing player resigned.',
+        GameOutcomeReason.drawAgreement => 'Both players agreed to a draw.',
         _ => 'The game has ended.',
       };
     }
@@ -177,6 +232,56 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (changed && notify) {
       notifyListeners();
     }
+  }
+
+  void _handleSessionUpdate(SessionUpdate update) {
+    if (update is MoveCommitted ||
+        update is StateReplaced ||
+        update is DrawOfferResolved) {
+      _synchronizeFromSession(clearSelection: true);
+    }
+  }
+
+  Future<void> _startSession() async {
+    try {
+      await _session.start();
+    } catch (error) {
+      _sessionError = error;
+      if (!_disposed) {
+        notifyListeners();
+      }
+    }
+  }
+
+  void _synchronizeFromSession({required bool clearSelection}) {
+    final nextState = _session.currentState;
+    final stateChanged = !identical(_state, nextState);
+    final selectionChanged =
+        clearSelection &&
+        (_selectedPieceId != null || _selectedPath.isNotEmpty);
+    _state = nextState;
+    _legalMoves = _session.legalMoves;
+    if (clearSelection) {
+      _clearSelection(notify: false);
+    }
+    if (stateChanged || selectionChanged) {
+      notifyListeners();
+    }
+  }
+
+  String _nextCommandId(String kind) {
+    _commandNumber += 1;
+    return '${_session.id}-$kind-$_commandNumber';
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    unawaited(_updateSubscription.cancel());
+    if (closeSessionOnDispose) {
+      unawaited(_session.close());
+    }
+    super.dispose();
   }
 
   static bool _isPrefix(

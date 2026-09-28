@@ -48,10 +48,11 @@ final class CommandReceipt {
   const CommandReceipt.rejected({
     required String commandId,
     required CommandRejection rejection,
+    bool duplicate = false,
   }) : this._(
          commandId: commandId,
          accepted: false,
-         duplicate: false,
+         duplicate: duplicate,
          rejection: rejection,
        );
 
@@ -67,6 +68,8 @@ abstract interface class GameSession {
   String get id;
   SessionAuthority get authority;
   GameState get currentState;
+  List<Move> get legalMoves;
+  DrawOffer? get pendingDrawOffer;
   SessionConnectionState get connectionState;
   Stream<SessionUpdate> get updates;
 
