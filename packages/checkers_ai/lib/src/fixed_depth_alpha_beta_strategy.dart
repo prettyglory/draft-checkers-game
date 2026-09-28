@@ -2,6 +2,7 @@ import 'package:checkers_engine/checkers_engine.dart';
 
 import 'ai_search.dart';
 import 'cancellation.dart';
+import 'move_ordering.dart';
 import 'position_evaluator.dart';
 import 'search_request_validator.dart';
 
@@ -9,12 +10,14 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
   FixedDepthAlphaBetaStrategy({
     required this.rulesEngine,
     PositionEvaluator? evaluator,
+    this.moveOrdering = const MoveOrdering(),
   }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine);
 
   static const strategyId = 'alpha-beta-fixed';
 
   final RulesEngine rulesEngine;
   final PositionEvaluator evaluator;
+  final MoveOrdering moveOrdering;
 
   @override
   String get id => strategyId;
@@ -34,7 +37,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     var bestScore = -_infinity;
     var completed = true;
 
-    for (final move in request.legalMoves) {
+    for (final move in moveOrdering.order(request.state, request.legalMoves)) {
       try {
         context.checkLimits();
         final nextState = rulesEngine.applyMove(request.state, move);
@@ -85,7 +88,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       return evaluator.evaluate(state, perspective).score;
     }
 
-    final moves = rulesEngine.legalMoves(state);
+    final moves = moveOrdering.order(state, rulesEngine.legalMoves(state));
     if (moves.isEmpty) {
       return evaluator.evaluate(state, perspective).score;
     }

@@ -188,3 +188,7 @@ a node or time ceiling interrupts an incomplete fixed-depth search.
 Iterative deepening runs that search from depth one upward, passing only the
 remaining node/time budget into each iteration. A deeper interrupted iteration
 never replaces the move from the last fully completed depth.
+
+Search ordering is deterministic: a previous principal move may be preferred,
+then longer captures and promotions are searched before stable move-ID order.
+Ordering copies its input and never changes rules-engine move collections.

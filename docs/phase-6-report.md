@@ -62,9 +62,16 @@ legal-move fuzzing, and a measured device performance budget.
 - Preserved a legal fallback when depth one could not complete.
 - Added full-depth, interrupted-depth, fallback, and cancellation tests.
 
+## Slice 5: deterministic move ordering
+
+- Added principal-move, longer-capture, promotion, and stable-ID priorities.
+- Integrated ordering at root and recursive alpha-beta nodes.
+- Kept input move collections immutable.
+- Added capture, promotion, preferred-move, determinism, and immutability tests.
+
 ## Remaining work
 
-- Move ordering and a history-safe transposition table.
+- History-safe transposition table.
 - Ten documented difficulty profiles.
 - Endgame knowledge.
 - Isolate worker and AI session actor integration.
