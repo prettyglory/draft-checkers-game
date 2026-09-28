@@ -6,14 +6,17 @@ import 'fixed_depth_alpha_beta_strategy.dart';
 import 'position_evaluator.dart';
 import 'search_budget.dart';
 import 'search_request_validator.dart';
+import 'transposition_table.dart';
 
 final class IterativeDeepeningStrategy implements AiStrategy {
   IterativeDeepeningStrategy({
     required this.rulesEngine,
     PositionEvaluator? evaluator,
+    TranspositionTable? transpositionTable,
   }) : _fixedDepth = FixedDepthAlphaBetaStrategy(
          rulesEngine: rulesEngine,
          evaluator: evaluator,
+         transpositionTable: transpositionTable,
        );
 
   static const strategyId = 'alpha-beta-iterative';
@@ -38,6 +41,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     var completedDepth = 0;
     var totalNodes = 0;
     var stopReason = SearchStopReason.depthLimit;
+    var transposition = const TranspositionDiagnostics();
 
     for (var depth = 1; depth <= maximumDepth; depth += 1) {
       _throwIfCancelled(request);
@@ -71,6 +75,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         ),
       );
       totalNodes += iteration.metadata.nodesExamined;
+      transposition = transposition.plus(iteration.metadata.transposition);
       if (iteration.metadata.completedDepth == depth) {
         bestMove = iteration.move;
         completedDepth = depth;
@@ -89,6 +94,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         completedDepth: completedDepth,
         elapsed: stopwatch.elapsed,
         stopReason: stopReason,
+        transposition: transposition,
       ),
     );
   }

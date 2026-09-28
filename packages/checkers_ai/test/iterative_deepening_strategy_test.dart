@@ -28,6 +28,7 @@ void main() {
     expect(result.metadata.completedDepth, 3);
     expect(result.metadata.stopReason, SearchStopReason.depthLimit);
     expect(result.metadata.nodesExamined, greaterThan(0));
+    expect(result.metadata.transposition.hits, greaterThan(0));
     expect(
       engine.validateMove(engine.createInitialState(), result.move).isValid,
       isTrue,

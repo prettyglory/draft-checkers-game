@@ -9,3 +9,4 @@ export 'src/iterative_deepening_strategy.dart';
 export 'src/move_ordering.dart';
 export 'src/position_evaluator.dart';
 export 'src/search_budget.dart';
+export 'src/transposition_table.dart';

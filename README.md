@@ -17,9 +17,9 @@ undo, and process resume remain for later Phase 5 slices.
 Phase 6 has started with a separate pure-Dart AI package. It now provides
 measurable search budgets and metadata, cancellation contracts, a seeded legal
 beginner strategy, weighted evaluation, fixed-depth alpha-beta, iterative
-deepening, and deterministic tactical move ordering. Ten difficulty profiles,
-transposition storage, isolate execution, and device performance evidence remain
-in progress.
+deepening, deterministic tactical move ordering, and a history-safe
+transposition table. Ten difficulty profiles, isolate execution, and device
+performance evidence remain in progress.
 
 ## Repository layout
 

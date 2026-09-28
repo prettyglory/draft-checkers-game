@@ -4,6 +4,7 @@ import 'package:checkers_engine/checkers_engine.dart';
 
 import 'cancellation.dart';
 import 'search_budget.dart';
+import 'transposition_table.dart';
 
 enum SearchStopReason { completed, nodeLimit, depthLimit, timeLimit, cancelled }
 
@@ -28,6 +29,7 @@ final class AiSearchMetadata {
     required this.completedDepth,
     required this.elapsed,
     required this.stopReason,
+    this.transposition = const TranspositionDiagnostics(),
   }) {
     if (strategyId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -48,6 +50,7 @@ final class AiSearchMetadata {
   final int completedDepth;
   final Duration elapsed;
   final SearchStopReason stopReason;
+  final TranspositionDiagnostics transposition;
 }
 
 final class AiSearchResult {

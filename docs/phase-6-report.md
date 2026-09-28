@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - search foundation and tactical ordering complete
+Status: In progress - search foundation and history-safe caching complete
 
 ## Documented outcome
 
@@ -69,9 +69,26 @@ legal-move fuzzing, and a measured device performance budget.
 - Kept input move collections immutable.
 - Added capture, promotion, preferred-move, determinism, and immutability tests.
 
+## Slice 6: history-safe transposition table
+
+- Added bounded exact, lower-bound, and upper-bound entries with searched depth,
+  score, best move, and generation metadata.
+- Keyed entries with the full canonical snapshot hash, evaluation perspective,
+  and all evaluation weights.
+- Included piece identities, side to move, revision/ply, complete repetition
+  history, ruleset counters, status, and outcome through `GameStateCodec`.
+- Protected deeper entries from weaker replacement and preferred exact entries
+  at equal depth.
+- Added deterministic capacity eviction and explicit table clearing.
+- Reused entries and preferred cached moves in fixed-depth and iterative search.
+- Added request-local probes, hits, bound use, cutoffs, stores, replacements,
+  rejected stores, evictions, occupancy, and capacity diagnostics.
+- Verified history/counter separation, depth replacement, all bound types, warm
+  reuse, deterministic cached/uncached selection, budgets, cancellation, and
+  iterative correctness.
+
 ## Remaining work
 
-- History-safe transposition table.
 - Ten documented difficulty profiles.
 - Endgame knowledge.
 - Isolate worker and AI session actor integration.

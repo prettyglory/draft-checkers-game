@@ -5,19 +5,23 @@ import 'cancellation.dart';
 import 'move_ordering.dart';
 import 'position_evaluator.dart';
 import 'search_request_validator.dart';
+import 'transposition_table.dart';
 
 final class FixedDepthAlphaBetaStrategy implements AiStrategy {
   FixedDepthAlphaBetaStrategy({
     required this.rulesEngine,
     PositionEvaluator? evaluator,
     this.moveOrdering = const MoveOrdering(),
-  }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine);
+    TranspositionTable? transpositionTable,
+  }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine),
+       transpositionTable = transpositionTable ?? TranspositionTable();
 
   static const strategyId = 'alpha-beta-fixed';
 
   final RulesEngine rulesEngine;
   final PositionEvaluator evaluator;
   final MoveOrdering moveOrdering;
+  final TranspositionTable transpositionTable;
 
   @override
   String get id => strategyId;
@@ -31,8 +35,15 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       throw const AiSearchException(AiSearchFailure.missingDepthBudget);
     }
 
-    final context = _SearchContext(request);
     final perspective = request.state.activeSide;
+    final diagnosticsBefore = transpositionTable.diagnostics;
+    final context = _SearchContext(
+      request,
+      transpositionTable,
+      transpositionTable.nextGeneration(),
+      evaluator.weights,
+      perspective,
+    );
     var bestMove = request.legalMoves.first;
     var bestScore = -_infinity;
     var completed = true;
@@ -71,6 +82,9 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
         stopReason: completed
             ? SearchStopReason.depthLimit
             : context.stopReason,
+        transposition: transpositionTable.diagnostics.difference(
+          diagnosticsBefore,
+        ),
       ),
     );
   }
@@ -84,15 +98,46 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     _SearchContext context,
   ) {
     context.visitNode();
+    final alphaOriginal = alpha;
+    final betaOriginal = beta;
+    final key = context.keyFor(state);
+    final cached = context.table.probe(key);
+    if (cached != null && cached.depth >= depth) {
+      if (cached.bound == TranspositionBound.exact) {
+        context.table.recordUse(cached, cutoff: true);
+        return cached.score;
+      }
+      if (cached.bound == TranspositionBound.lower && cached.score > alpha) {
+        alpha = cached.score;
+      }
+      if (cached.bound == TranspositionBound.upper && cached.score < beta) {
+        beta = cached.score;
+      }
+      final cutoff = alpha >= beta;
+      context.table.recordUse(cached, cutoff: cutoff);
+      if (cutoff) {
+        return cached.score;
+      }
+    }
     if (depth == 0 || state.status == GameStatus.completed) {
-      return evaluator.evaluate(state, perspective).score;
+      final score = evaluator.evaluate(state, perspective).score;
+      context.store(key, depth, score, TranspositionBound.exact, null);
+      return score;
     }
 
-    final moves = moveOrdering.order(state, rulesEngine.legalMoves(state));
+    final moves = moveOrdering.order(
+      state,
+      rulesEngine.legalMoves(state),
+      preferredMoveId: cached?.bestMoveId,
+    );
     if (moves.isEmpty) {
-      return evaluator.evaluate(state, perspective).score;
+      final score = evaluator.evaluate(state, perspective).score;
+      context.store(key, depth, score, TranspositionBound.exact, null);
+      return score;
     }
 
+    late final int result;
+    String? bestMoveId;
     if (state.activeSide == perspective) {
       var value = -_infinity;
       for (final move in moves) {
@@ -107,6 +152,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
         );
         if (score > value) {
           value = score;
+          bestMoveId = move.id;
         }
         if (value > alpha) {
           alpha = value;
@@ -115,31 +161,39 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           break;
         }
       }
-      return value;
+      result = value;
+    } else {
+      var value = _infinity;
+      for (final move in moves) {
+        final child = rulesEngine.applyMove(state, move);
+        final score = _alphaBeta(
+          child,
+          depth - 1,
+          perspective,
+          alpha,
+          beta,
+          context,
+        );
+        if (score < value) {
+          value = score;
+          bestMoveId = move.id;
+        }
+        if (value < beta) {
+          beta = value;
+        }
+        if (alpha >= beta) {
+          break;
+        }
+      }
+      result = value;
     }
-
-    var value = _infinity;
-    for (final move in moves) {
-      final child = rulesEngine.applyMove(state, move);
-      final score = _alphaBeta(
-        child,
-        depth - 1,
-        perspective,
-        alpha,
-        beta,
-        context,
-      );
-      if (score < value) {
-        value = score;
-      }
-      if (value < beta) {
-        beta = value;
-      }
-      if (alpha >= beta) {
-        break;
-      }
-    }
-    return value;
+    final bound = result <= alphaOriginal
+        ? TranspositionBound.upper
+        : result >= betaOriginal
+        ? TranspositionBound.lower
+        : TranspositionBound.exact;
+    context.store(key, depth, result, bound, bestMoveId);
+    return result;
   }
 
   static void _throwIfCancelled(AiSearchRequest request) {
@@ -152,12 +206,47 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
 }
 
 final class _SearchContext {
-  _SearchContext(this.request) : stopwatch = Stopwatch()..start();
+  _SearchContext(
+    this.request,
+    this.table,
+    this.generation,
+    this.weights,
+    this.perspective,
+  ) : stopwatch = Stopwatch()..start();
 
   final AiSearchRequest request;
+  final TranspositionTable table;
+  final int generation;
+  final EvaluationWeights weights;
+  final PlayerSide perspective;
   final Stopwatch stopwatch;
   int nodesExamined = 0;
   SearchStopReason stopReason = SearchStopReason.completed;
+
+  TranspositionKey keyFor(GameState state) => TranspositionKey.fromState(
+    state: state,
+    perspective: perspective,
+    weights: weights,
+  );
+
+  void store(
+    TranspositionKey key,
+    int depth,
+    int score,
+    TranspositionBound bound,
+    String? bestMoveId,
+  ) {
+    table.store(
+      key,
+      TranspositionEntry(
+        depth: depth,
+        score: score,
+        bound: bound,
+        bestMoveId: bestMoveId,
+        generation: generation,
+      ),
+    );
+  }
 
   void visitNode() {
     checkLimits();
