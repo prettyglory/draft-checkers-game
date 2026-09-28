@@ -7,10 +7,10 @@ the UI and from any particular network transport.
 
 ## Current status
 
-Phase 2 (deterministic core engine) is complete. Immutable board transitions,
-canonical state/move serialization, SHA-256 hashes, and validated replay are
-implemented and tested. Gameplay is not advertised as playable yet; the next
-milestone is the complete American Checkers ruleset.
+Phase 3 (American Checkers rules) is complete. The WCDF opening position,
+movement, compulsory captures, complete multi-jumps, promotion, wins, third
+repetition, and 40-move draw behavior are implemented and tested. The next
+milestone is the responsive, accessible board UI.
 
 ## Repository layout
 
@@ -50,5 +50,6 @@ dart test packages/game_session
 See [the architecture](docs/architecture.md), [ruleset research](docs/rulesets.md),
 [delivery roadmap](docs/roadmap.md), [risk register](docs/risks.md), and
 [Phase 1 report](docs/phase-1-report.md). The completed engine milestone is
-recorded in the [Phase 2 report](docs/phase-2-report.md).
+recorded in the [Phase 2 report](docs/phase-2-report.md), and the first playable
+ruleset is documented in the [Phase 3 report](docs/phase-3-report.md).
 

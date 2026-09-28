@@ -21,7 +21,12 @@ void main() {
     );
   }
 
-  GameState state({Iterable<Piece>? pieces, int revision = 7}) {
+  GameState state({
+    Iterable<Piece>? pieces,
+    int revision = 7,
+    Iterable<String> previousPositionHashes = const <String>[],
+    Map<String, int> ruleCounters = const <String, int>{},
+  }) {
     return GameState(
       rulesetId: 'american',
       boardSize: 8,
@@ -46,6 +51,8 @@ void main() {
       activeSide: PlayerSide.light,
       ply: 7,
       revision: revision,
+      previousPositionHashes: previousPositionHashes,
+      ruleCounters: ruleCounters,
     );
   }
 
@@ -104,7 +111,10 @@ void main() {
 
   group('GameStateCodec', () {
     test('round-trips a snapshot with canonical output', () {
-      final original = state();
+      final original = state(
+        previousPositionHashes: <String>[List<String>.filled(64, 'a').join()],
+        ruleCounters: const <String, int>{'quietPly': 12},
+      );
 
       final encoded = codec.encode(original);
       final decoded = codec.decode(encoded);
@@ -117,6 +127,8 @@ void main() {
       expect(decoded.ply, original.ply);
       expect(decoded.revision, original.revision);
       expect(decoded.positionHash, original.positionHash);
+      expect(decoded.positionHistory, original.positionHistory);
+      expect(decoded.ruleCounters, original.ruleCounters);
       expect(codec.snapshotHash(decoded), codec.snapshotHash(original));
     });
 
@@ -146,7 +158,7 @@ void main() {
 
     test('rejects unsupported versions and tampered hashes', () {
       final json = codec.toJson(state());
-      final unsupported = <String, Object?>{...json, 'schemaVersion': 2};
+      final unsupported = <String, Object?>{...json, 'schemaVersion': 3};
       final tampered = <String, Object?>{
         ...json,
         'positionHash': List<String>.filled(64, '0').join(),
@@ -169,6 +181,19 @@ void main() {
       ];
 
       expect(() => codec.fromJson(json), throwsFormatException);
+    });
+
+    test('migrates schema version 1 snapshots with default history', () {
+      final original = state();
+      final legacy = codec.toJson(original)
+        ..['schemaVersion'] = 1
+        ..remove('positionHistory')
+        ..remove('ruleCounters');
+
+      final decoded = codec.fromJson(legacy);
+
+      expect(decoded.positionHistory, <String>[decoded.positionHash]);
+      expect(decoded.ruleCounters, isEmpty);
     });
 
     test('round-trips a completed outcome', () {

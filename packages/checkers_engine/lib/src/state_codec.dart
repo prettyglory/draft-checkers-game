@@ -10,7 +10,7 @@ import 'piece.dart';
 final class GameStateCodec {
   const GameStateCodec();
 
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
 
   String encode(GameState state) => jsonEncode(toJson(state));
 
@@ -43,6 +43,11 @@ final class GameStateCodec {
       'ply': state.ply,
       'revision': state.revision,
       'positionHash': state.positionHash,
+      'positionHistory': <Object?>[...state.positionHistory],
+      'ruleCounters': <String, Object?>{
+        for (final key in state.ruleCounters.keys.toList()..sort())
+          key: state.ruleCounters[key],
+      },
       'status': state.status.name,
       'outcome': switch (state.outcome) {
         null => null,
@@ -67,10 +72,10 @@ final class GameStateCodec {
 
   GameState _fromJson(Map<String, Object?> json) {
     final version = _asInt(json['schemaVersion'], 'schemaVersion');
-    if (version != schemaVersion) {
+    if (version != 1 && version != schemaVersion) {
       throw FormatException(
         'Unsupported game-state schema version $version; expected '
-        '$schemaVersion.',
+        '1 or $schemaVersion.',
       );
     }
 
@@ -83,6 +88,25 @@ final class GameStateCodec {
         ),
     ];
     final outcomeJson = json['outcome'];
+    final encodedPositionHash = _asString(json['positionHash'], 'positionHash');
+    final positionHistory = version == 1
+        ? <String>[encodedPositionHash]
+        : <String>[
+            for (final value in _asList(
+              json['positionHistory'],
+              'positionHistory',
+            ))
+              _asString(value, 'positionHistory[]'),
+          ];
+    if (positionHistory.isEmpty ||
+        positionHistory.last != encodedPositionHash) {
+      throw const FormatException(
+        'positionHistory must end with the current positionHash.',
+      );
+    }
+    final ruleCounters = version == 1
+        ? const <String, int>{}
+        : _asIntMap(json['ruleCounters'], 'ruleCounters');
 
     return GameState(
       rulesetId: _asString(json['rulesetId'], 'rulesetId'),
@@ -95,7 +119,9 @@ final class GameStateCodec {
       ),
       ply: _asInt(json['ply'], 'ply'),
       revision: _asInt(json['revision'], 'revision'),
-      positionHash: _asString(json['positionHash'], 'positionHash'),
+      positionHash: encodedPositionHash,
+      previousPositionHashes: positionHistory.take(positionHistory.length - 1),
+      ruleCounters: ruleCounters,
       status: _enumByName(
         GameStatus.values,
         _asString(json['status'], 'status'),
@@ -202,6 +228,14 @@ final class GameStateCodec {
       throw FormatException('$field must be an integer.');
     }
     return value;
+  }
+
+  static Map<String, int> _asIntMap(Object? value, String field) {
+    final objectMap = _asObjectMap(value, field);
+    return <String, int>{
+      for (final entry in objectMap.entries)
+        entry.key: _asInt(entry.value, '$field.${entry.key}'),
+    };
   }
 
   static T _enumByName<T extends Enum>(

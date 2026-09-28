@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'board.dart';
 import 'piece.dart';
 import 'position_hasher.dart';
@@ -43,6 +45,8 @@ final class GameState {
     required this.ply,
     required this.revision,
     String? positionHash,
+    Iterable<String> previousPositionHashes = const <String>[],
+    Map<String, int> ruleCounters = const <String, int>{},
     this.status = GameStatus.active,
     this.outcome,
   }) : board = Board(size: boardSize, pieces: pieces) {
@@ -77,6 +81,30 @@ final class GameState {
       );
     }
     this.positionHash = computedPositionHash;
+    final previousHashes = List<String>.unmodifiable(previousPositionHashes);
+    if (previousHashes.any((hash) => !_isSha256(hash))) {
+      throw ArgumentError.value(
+        previousHashes,
+        'previousPositionHashes',
+        'Position history entries must be SHA-256 hashes.',
+      );
+    }
+    positionHistory = List<String>.unmodifiable(<String>[
+      ...previousHashes,
+      computedPositionHash,
+    ]);
+    if (ruleCounters.entries.any(
+      (entry) => entry.key.trim().isEmpty || entry.value < 0,
+    )) {
+      throw ArgumentError.value(
+        ruleCounters,
+        'ruleCounters',
+        'Rule counter names cannot be empty and values cannot be negative.',
+      );
+    }
+    this.ruleCounters = UnmodifiableMapView<String, int>(
+      Map<String, int>.of(ruleCounters),
+    );
     if (status == GameStatus.completed && outcome == null) {
       throw ArgumentError('A completed game must have an outcome.');
     }
@@ -92,8 +120,18 @@ final class GameState {
   final int ply;
   final int revision;
   late final String positionHash;
+  late final List<String> positionHistory;
+  late final Map<String, int> ruleCounters;
   final GameStatus status;
   final GameOutcome? outcome;
 
   List<Piece> get pieces => board.pieces;
+
+  int positionOccurrenceCount(String hash) {
+    return positionHistory.where((candidate) => candidate == hash).length;
+  }
+
+  static bool _isSha256(String value) {
+    return RegExp(r'^[0-9a-f]{64}$').hasMatch(value);
+  }
 }

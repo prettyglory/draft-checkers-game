@@ -1,6 +1,7 @@
 /// Deterministic checkers domain contracts shared by every game mode.
 library;
 
+export 'src/american_checkers_rules.dart';
 export 'src/board.dart';
 export 'src/board_position.dart';
 export 'src/game_replay.dart';

@@ -23,6 +23,13 @@ kings, and a turn ending on promotion. The rules engine therefore needs a
 
 [WCDF Rules of Draughts (PDF)](https://wcdf.net/rules/rules_of_checkers_english.pdf)
 
+Implementation status: `AmericanCheckersRulesEngine` implements WCDF rules
+1.8-1.21 and board-derived results from rules 1.30 and 1.32. It tracks full
+position history for third repetition and an 80-ply counter representing 40
+moves by each player without a capture or uncrowned-man advance. Resignation,
+timeout, forfeiture, and agreed draws remain session-level adjudications rather
+than legal board moves.
+
 ### International Draughts
 
 FMJD rules define the 10x10 board, backward capture by men, flying kings,
@@ -52,10 +59,10 @@ code.
 
 [FMJD Turkish Draughts rules (PDF)](https://www.fmjd.org/downloads/td/TD_eng.pdf)
 
-## Open rules questions before implementation
+## Open questions for remaining rulesets
 
-- Encode every federation draw rule, including endgame material-specific move
-  limits, as explicit counters rather than one generic repetition rule.
+- Encode each remaining federation's draw rules, including material-specific
+  move limits, as explicit namespaced counters rather than one generic rule.
 - Confirm whether a product-friendly casual preset may differ from tournament
   rules; if offered, label it as a variant, never as the country ruleset.
 - Validate notation orientation and starting-player conventions in fixtures.

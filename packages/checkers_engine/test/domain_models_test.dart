@@ -127,6 +127,11 @@ void main() {
 
       expect(state.outcome?.winner, PlayerSide.dark);
       expect(state.positionHash, hasLength(64));
+      expect(
+        () => state.positionHistory.add(state.positionHash),
+        throwsUnsupportedError,
+      );
+      expect(() => state.ruleCounters['counter'] = 1, throwsUnsupportedError);
     });
   });
 

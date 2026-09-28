@@ -52,13 +52,13 @@ class FoundationScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Icon(
-                            Icons.memory_rounded,
+                            Icons.rule_rounded,
                             size: 20,
                             color: scheme.onSecondaryContainer,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Phase 2 · Core engine ready',
+                            'Phase 3 · American rules ready',
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: scheme.onSecondaryContainer,
                             ),

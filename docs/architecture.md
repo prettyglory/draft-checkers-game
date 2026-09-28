@@ -79,6 +79,9 @@ reconnect checks and deterministic replay. The position hash excludes piece
 identities and move counters so equivalent positions can be compared for
 repetition. The snapshot hash includes identities, counters, status, and
 outcome so synchronization can detect any authoritative-state drift.
+`GameState` also carries immutable position history and namespaced ruleset
+counters. These fields are included in schema-v2 snapshots and allow draw rules
+to remain deterministic across saves, replays, and reconnects.
 
 ## One session model for every mode
 
