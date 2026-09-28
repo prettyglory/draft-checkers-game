@@ -31,9 +31,19 @@ legal-move fuzzing, and a measured device performance budget.
 - Mismatched legal moves, completed games, cancellation, and invalid budgets are
   rejected explicitly.
 
+## Slice 2: weighted position evaluation
+
+- Added configurable weights for men, kings, uncrowned advancement, center
+  control, active-side mobility, and terminal outcomes.
+- Added a measurable evaluation breakdown rather than exposing only an opaque
+  total score.
+- Made evaluation symmetric by player perspective.
+- Required terminal scores to dominate the combined heuristic weights.
+- Added tactical terminal, material, king-value, advancement, center-control,
+  symmetry, and validation fixtures.
+
 ## Remaining work
 
-- Position evaluation and tactical fixtures.
 - Fixed-depth alpha-beta search.
 - Iterative deepening with enforced node/time budgets and cancellation.
 - Move ordering and a history-safe transposition table.

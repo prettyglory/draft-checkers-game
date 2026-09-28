@@ -174,3 +174,8 @@ validated resource budgets, and cancellation tokens. Results contain the chosen
 move plus strategy ID, nodes examined, completed depth, elapsed duration, and a
 stop reason. Random strategies require an explicit seed so tests and profiles
 can reproduce their move sequence.
+
+Static evaluation is expressed as explicit material, uncrowned advancement,
+center-control, active-side mobility, and terminal terms. Every evaluation is
+from a requested player's perspective, and terminal wins/losses dominate the
+combined heuristic weights.
