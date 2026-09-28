@@ -42,9 +42,19 @@ legal-move fuzzing, and a measured device performance budget.
 - Added tactical terminal, material, king-value, advancement, center-control,
   symmetry, and validation fixtures.
 
+## Slice 3: fixed-depth alpha-beta
+
+- Added deterministic maximizing/minimizing alpha-beta search.
+- Expanded every node through the authoritative rules engine.
+- Added terminal-first evaluation and stable move-order tie breaking.
+- Enforced depth, node, duration, and cancellation checks during recursion.
+- Returned a legal fallback with explicit metadata when a resource ceiling
+  interrupts the requested depth.
+- Added immediate-win, opening determinism, node-budget, depth-contract, and
+  cancellation tests.
+
 ## Remaining work
 
-- Fixed-depth alpha-beta search.
 - Iterative deepening with enforced node/time budgets and cancellation.
 - Move ordering and a history-safe transposition table.
 - Ten documented difficulty profiles.

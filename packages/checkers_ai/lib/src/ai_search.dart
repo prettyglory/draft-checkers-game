@@ -68,6 +68,7 @@ enum AiSearchFailure {
   completedGame,
   noLegalMoves,
   legalMovesMismatch,
+  missingDepthBudget,
 }
 
 final class AiSearchException implements Exception {

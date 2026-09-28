@@ -179,3 +179,8 @@ Static evaluation is expressed as explicit material, uncrowned advancement,
 center-control, active-side mobility, and terminal terms. Every evaluation is
 from a requested player's perspective, and terminal wins/losses dominate the
 combined heuristic weights.
+
+The first search implementation is deterministic fixed-depth alpha-beta. It
+expands states only through the rules engine, keeps engine move ordering for
+stable tie-breaking, reports expanded nodes, and returns a legal fallback when
+a node or time ceiling interrupts an incomplete fixed-depth search.
