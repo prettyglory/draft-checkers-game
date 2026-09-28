@@ -167,3 +167,10 @@ It returns a move plus search metadata. Beginner play may sample legal moves;
 higher levels use iterative-deepening minimax/alpha-beta, transposition tables,
 move ordering, evaluation weights, and endgame knowledge. Search runs in an
 isolate with time/node/cancellation budgets so UI work is never blocked.
+
+`checkers_ai` is an outer pure-Dart package that depends on `checkers_engine`;
+the engine never depends on AI code. Strategies receive copied legal-move lists,
+validated resource budgets, and cancellation tokens. Results contain the chosen
+move plus strategy ID, nodes examined, completed depth, elapsed duration, and a
+stop reason. Random strategies require an explicit seed so tests and profiles
+can reproduce their move sequence.

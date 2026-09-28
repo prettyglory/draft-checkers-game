@@ -1,0 +1,44 @@
+# Phase 6 report
+
+Started: 2026-09-28
+
+Status: In progress - AI contracts and beginner strategy complete
+
+## Documented outcome
+
+Phase 6 delivers ten measurable AI difficulty profiles, iterative search in an
+isolate, cancellation, explicit time/node budgets, tactical evidence,
+legal-move fuzzing, and a measured device performance budget.
+
+## Slice 1: contracts and beginner strategy
+
+- Added a pure-Dart `checkers_ai` package that depends only on
+  `checkers_engine`.
+- Added validated node, depth, and duration budget contracts.
+- Added cancellation tokens and a cancellation controller.
+- Added immutable search requests, results, metadata, stop reasons, and typed
+  search failures.
+- Added a seeded beginner strategy with reproducible random selection.
+- Required the supplied legal moves to exactly match the authoritative rules
+  engine result before selection.
+- Added CI formatting, analysis, and test gates for the package.
+
+## Evidence
+
+- Beginner results always belong to the authoritative legal-move list.
+- A configured seed reproduces the same selection sequence.
+- Request move collections are copied and exposed as unmodifiable.
+- Mismatched legal moves, completed games, cancellation, and invalid budgets are
+  rejected explicitly.
+
+## Remaining work
+
+- Position evaluation and tactical fixtures.
+- Fixed-depth alpha-beta search.
+- Iterative deepening with enforced node/time budgets and cancellation.
+- Move ordering and a history-safe transposition table.
+- Ten documented difficulty profiles.
+- Endgame knowledge.
+- Isolate worker and AI session actor integration.
+- Flutter mode/level selection and thinking state.
+- Legal-move fuzzing and measured low-end-device performance evidence.

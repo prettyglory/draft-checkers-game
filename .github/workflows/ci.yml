@@ -61,6 +61,22 @@ jobs:
         working-directory: packages/game_session
         run: dart test
 
+      - name: Resolve AI dependencies
+        working-directory: packages/checkers_ai
+        run: dart pub get
+
+      - name: Check AI formatting
+        working-directory: packages/checkers_ai
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze AI package
+        working-directory: packages/checkers_ai
+        run: dart analyze --fatal-infos
+
+      - name: Test AI package
+        working-directory: packages/checkers_ai
+        run: dart test
+
       - name: Resolve client dependencies
         working-directory: apps/mobile
         run: flutter pub get
@@ -76,4 +92,3 @@ jobs:
       - name: Test client
         working-directory: apps/mobile
         run: flutter test
-

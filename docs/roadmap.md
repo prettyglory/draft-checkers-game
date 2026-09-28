@@ -3,8 +3,9 @@
 Every phase ends with updated documentation, formatting/static analysis, tests,
 manual acceptance of the changed flow, and a meaningful commit.
 
-Phases 1-4 are complete. Phase 5 is in progress: the authoritative in-process
-session slice is complete, while persistence, clocks, undo, and resume remain.
+Phases 1-4 are complete. Phase 5 remains in progress. Phase 6 has started with
+AI search contracts and a legal seeded beginner strategy; advanced search,
+profiles, isolate execution, and performance evidence remain.
 
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
@@ -13,7 +14,7 @@ session slice is complete, while persistence, clocks, undo, and resume remain.
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
 | 5. Single player (in progress) | Authoritative local session complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus 21 Flutter regression/integration tests; end-to-end persistence evidence pending |
-| 6. AI levels | Ten measurable strategies/budgets, isolate worker, cancellation | Tactical suite, legal-move fuzzing, device performance budget |
+| 6. AI levels (in progress) | Search contracts and legal beginner strategy complete; advanced search, ten profiles, isolate worker, and cancellation remain | Beginner legality/determinism tests complete; tactical suite, legal-move fuzzing, and device performance budget pending |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |
 | 9. Same-device | Two-player handoff/orientation, rematch | Full local match and restoration tests |

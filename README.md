@@ -14,12 +14,19 @@ ordered updates, and handles resignation and draw agreements. The completed
 Phase 4 board behavior remains covered on phone and tablet. Persistence, clocks,
 undo, and process resume remain for later Phase 5 slices.
 
+Phase 6 has started with a separate pure-Dart AI package. Its first slice
+defines measurable search budgets and metadata, cancellation contracts, and a
+seeded beginner strategy that selects only authoritative legal moves. Advanced
+search, ten difficulty profiles, isolate execution, and device performance
+evidence remain in progress.
+
 ## Repository layout
 
 ```text
 apps/mobile/                 Flutter client
 packages/checkers_engine/    Pure-Dart board, state, codecs, replay, and rules API
 packages/game_session/       Session contracts and local authoritative reducer
+packages/checkers_ai/         Budgeted AI contracts and strategies
 docs/                        Architecture, rules research, roadmap, and risks
 ```
 
@@ -57,3 +64,4 @@ ruleset is documented in the [Phase 3 report](docs/phase-3-report.md). The
 responsive playable board milestone is recorded in the
 [Phase 4 report](docs/phase-4-report.md). The authoritative local-session slice
 is documented in the [Phase 5 report](docs/phase-5-report.md).
+Phase 6 progress is tracked in the [Phase 6 report](docs/phase-6-report.md).
