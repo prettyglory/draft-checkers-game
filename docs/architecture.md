@@ -89,6 +89,12 @@ Every UI uses `GameSession`. It exposes the current state, an ordered update
 stream, command submission, reconnect, and close. The authority changes by mode;
 the view-model does not.
 
+Phase 4 is the temporary exception at the milestone boundary: its local board
+view-model talks directly to `AmericanCheckersRulesEngine` so board interaction
+can be validated before game-flow concerns are introduced. Phase 5 will add the
+in-process `GameSession` integration; no session behavior is implemented by the
+Phase 4 board.
+
 | Mode | Authority | Transport/actor |
 | --- | --- | --- |
 | Same-device | Current device | In-process reducer |
@@ -159,4 +165,3 @@ It returns a move plus search metadata. Beginner play may sample legal moves;
 higher levels use iterative-deepening minimax/alpha-beta, transposition tables,
 move ordering, evaluation weights, and endgame knowledge. Search runs in an
 isolate with time/node/cancellation budgets so UI work is never blocked.
-

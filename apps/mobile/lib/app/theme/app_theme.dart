@@ -16,10 +16,20 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
+      focusColor: scheme.tertiary.withValues(alpha: 0.22),
       textTheme: const TextTheme(
         displaySmall: TextStyle(fontWeight: FontWeight.w800, letterSpacing: -1),
         titleMedium: TextStyle(fontWeight: FontWeight.w700),
         bodyLarge: TextStyle(height: 1.5),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
     );
   }

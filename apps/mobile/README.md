@@ -1,17 +1,29 @@
-# draft_game
+# Draft Game mobile client
 
-A new Flutter project.
+The Flutter client renders a responsive, accessible American Checkers board on
+Android, iOS, web, and desktop targets. Phase 4 supports local board interaction,
+legal move and capture guidance, complete multi-jump selection, promotion,
+light/dark themes, and keyboard operation.
 
-## Getting Started
+The board currently owns a local rules-engine view-model. Phase 5 will introduce
+the single-player game flow, persistence, clocks, undo policy, and resume
+behavior; those features are not part of the Phase 4 client.
 
-This project is a starting point for a Flutter application.
+## Run
 
-A few resources to get you started if this is your first Flutter project:
+From the repository root:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```powershell
+flutter pub get --directory apps/mobile
+flutter run --directory apps/mobile
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Verify
+
+```powershell
+flutter analyze apps/mobile
+flutter test apps/mobile
+```
+
+Golden baselines cover light and dark phone/tablet layouts under
+`test/goldens/`.

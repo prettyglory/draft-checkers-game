@@ -7,10 +7,12 @@ the UI and from any particular network transport.
 
 ## Current status
 
-Phase 3 (American Checkers rules) is complete. The WCDF opening position,
-movement, compulsory captures, complete multi-jumps, promotion, wins, third
-repetition, and 40-move draw behavior are implemented and tested. The next
-milestone is the responsive, accessible board UI.
+Phase 4 (playable board UI) is complete. The Flutter client presents the WCDF
+American Checkers rules through a responsive, accessible local board with legal
+selection targets, compulsory-capture guidance, complete multi-jump paths,
+promotion and king presentation, light/dark themes, and keyboard operation.
+Phone and tablet layouts are covered by widget, semantics, and golden tests.
+Phase 5, the single-player game flow and persistence milestone, has not started.
 
 ## Repository layout
 
@@ -51,5 +53,6 @@ See [the architecture](docs/architecture.md), [ruleset research](docs/rulesets.m
 [delivery roadmap](docs/roadmap.md), [risk register](docs/risks.md), and
 [Phase 1 report](docs/phase-1-report.md). The completed engine milestone is
 recorded in the [Phase 2 report](docs/phase-2-report.md), and the first playable
-ruleset is documented in the [Phase 3 report](docs/phase-3-report.md).
-
+ruleset is documented in the [Phase 3 report](docs/phase-3-report.md). The
+responsive playable board milestone is recorded in the
+[Phase 4 report](docs/phase-4-report.md).

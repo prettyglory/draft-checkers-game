@@ -3,12 +3,15 @@
 Every phase ends with updated documentation, formatting/static analysis, tests,
 manual acceptance of the changed flow, and a meaningful commit.
 
+Phases 1-4 are complete. Phase 5 is the next planned milestone and has not
+started.
+
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
 | 1. Foundation | Stack decision, architecture, contracts, research, risks, CI, platform scaffold | All packages analyze/test; docs reviewed; no fake product controls |
 | 2. Core engine | Immutable board/state, move application, serialization, replay/hash | Domain unit tests and property invariants |
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
-| 4. Board UI | Responsive accessible board, selection, move/capture highlights, motion primitives | Widget/golden/accessibility tests on phone/tablet sizes |
+| 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
 | 5. Single player | Game flow, persistence, clocks, undo policy, resume | End-to-end offline game and process-restart test |
 | 6. AI levels | Ten measurable strategies/budgets, isolate worker, cancellation | Tactical suite, legal-move fuzzing, device performance budget |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
@@ -31,4 +34,3 @@ Commits should be small enough to review and large enough to describe a real
 change. Empty commits, timestamp-only edits, and history spam are not used to
 inflate the contribution graph. Feature branches should normally contain one or
 more green commits; `main` remains releasable at phase boundaries.
-
