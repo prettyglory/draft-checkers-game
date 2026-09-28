@@ -184,3 +184,7 @@ The first search implementation is deterministic fixed-depth alpha-beta. It
 expands states only through the rules engine, keeps engine move ordering for
 stable tie-breaking, reports expanded nodes, and returns a legal fallback when
 a node or time ceiling interrupts an incomplete fixed-depth search.
+
+Iterative deepening runs that search from depth one upward, passing only the
+remaining node/time budget into each iteration. A deeper interrupted iteration
+never replaces the move from the last fully completed depth.

@@ -53,9 +53,17 @@ legal-move fuzzing, and a measured device performance budget.
 - Added immediate-win, opening determinism, node-budget, depth-contract, and
   cancellation tests.
 
+## Slice 4: iterative deepening
+
+- Added depth-by-depth alpha-beta search through a requested maximum depth.
+- Carried remaining node and duration ceilings across iterations.
+- Retained the move from the last fully completed depth when a deeper iteration
+  was interrupted.
+- Preserved a legal fallback when depth one could not complete.
+- Added full-depth, interrupted-depth, fallback, and cancellation tests.
+
 ## Remaining work
 
-- Iterative deepening with enforced node/time budgets and cancellation.
 - Move ordering and a history-safe transposition table.
 - Ten documented difficulty profiles.
 - Endgame knowledge.
