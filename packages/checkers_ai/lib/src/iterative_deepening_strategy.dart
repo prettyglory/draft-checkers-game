@@ -14,18 +14,22 @@ final class IterativeDeepeningStrategy implements AiStrategy {
   IterativeDeepeningStrategy({
     required this.rulesEngine,
     PositionEvaluator? evaluator,
+    MoveOrdering moveOrdering = const MoveOrdering(),
     TranspositionTable? transpositionTable,
     int maxQuiescenceDepth = 8,
     AspirationWindowConfig? aspirationWindow,
     bool usePrincipalVariationSearch = true,
+    bool useKillerHistoryHeuristics = true,
     LateMoveReductionConfig? lateMoveReductions,
   }) : aspirationWindow = aspirationWindow ?? AspirationWindowConfig(),
        _fixedDepth = FixedDepthAlphaBetaStrategy(
          rulesEngine: rulesEngine,
          evaluator: evaluator,
+         moveOrdering: moveOrdering,
          transpositionTable: transpositionTable,
          maxQuiescenceDepth: maxQuiescenceDepth,
          usePrincipalVariationSearch: usePrincipalVariationSearch,
+         useKillerHistoryHeuristics: useKillerHistoryHeuristics,
          lateMoveReductions: lateMoveReductions,
        );
 

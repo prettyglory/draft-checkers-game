@@ -15,6 +15,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     TranspositionTable? transpositionTable,
     this.maxQuiescenceDepth = 8,
     this.usePrincipalVariationSearch = true,
+    this.useKillerHistoryHeuristics = true,
     LateMoveReductionConfig? lateMoveReductions,
   }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine),
        transpositionTable = transpositionTable ?? TranspositionTable(),
@@ -36,6 +37,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
   final TranspositionTable transpositionTable;
   final int maxQuiescenceDepth;
   final bool usePrincipalVariationSearch;
+  final bool useKillerHistoryHeuristics;
   final LateMoveReductionConfig lateMoveReductions;
 
   @override
@@ -81,6 +83,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       perspective,
       heuristics,
       usePrincipalVariationSearch,
+      useKillerHistoryHeuristics,
       lateMoveReductions,
     );
     var bestMove = request.legalMoves.first;
@@ -243,7 +246,9 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       state,
       rulesEngine.legalMoves(state),
       preferredMoveId: cached?.bestMoveId,
-      heuristics: context.orderingHeuristics,
+      heuristics: context.useKillerHistoryHeuristics
+          ? context.orderingHeuristics
+          : null,
       ply: ply,
     );
     if (moves.isEmpty) {
@@ -357,12 +362,14 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           alpha = value;
         }
         if (alpha >= beta) {
-          context.orderingHeuristics.recordQuietCutoff(
-            state: state,
-            move: move,
-            ply: ply,
-            remainingDepth: depth,
-          );
+          if (context.useKillerHistoryHeuristics) {
+            context.orderingHeuristics.recordQuietCutoff(
+              state: state,
+              move: move,
+              ply: ply,
+              remainingDepth: depth,
+            );
+          }
           break;
         }
       }
@@ -473,12 +480,14 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           beta = value;
         }
         if (alpha >= beta) {
-          context.orderingHeuristics.recordQuietCutoff(
-            state: state,
-            move: move,
-            ply: ply,
-            remainingDepth: depth,
-          );
+          if (context.useKillerHistoryHeuristics) {
+            context.orderingHeuristics.recordQuietCutoff(
+              state: state,
+              move: move,
+              ply: ply,
+              remainingDepth: depth,
+            );
+          }
           break;
         }
       }
@@ -521,7 +530,8 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     }
     context.recordLmrCandidate();
     if (move.id == preferredMoveId ||
-        context.orderingHeuristics.killerRank(ply, move) != null) {
+        (context.useKillerHistoryHeuristics &&
+            context.orderingHeuristics.killerRank(ply, move) != null)) {
       return 0;
     }
     return config.reduction;
@@ -695,6 +705,7 @@ final class _SearchContext {
     this.perspective,
     this.orderingHeuristics,
     this.usePrincipalVariationSearch,
+    this.useKillerHistoryHeuristics,
     this.lateMoveReductions,
   ) : stopwatch = Stopwatch()..start();
 
@@ -705,6 +716,7 @@ final class _SearchContext {
   final PlayerSide perspective;
   final MoveOrderingHeuristics orderingHeuristics;
   final bool usePrincipalVariationSearch;
+  final bool useKillerHistoryHeuristics;
   final LateMoveReductionConfig lateMoveReductions;
   final Stopwatch stopwatch;
   int nodesExamined = 0;

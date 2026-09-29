@@ -29,6 +29,12 @@ safe non-PV quiet branches and verify any promising result at full depth. Ten
 difficulty profiles, isolate execution, and device performance evidence remain
 in progress.
 
+Deterministic search-work benchmarks can be run separately with
+`dart run benchmark/search_benchmark.dart --depth=5` from `packages/checkers_ai`.
+The [benchmark report](docs/ai-search-benchmarks.md) documents fixtures,
+methodology, node counts, and interpretation without imposing fragile timing
+thresholds on CI.
+
 ## Repository layout
 
 ```text

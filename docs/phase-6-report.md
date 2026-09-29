@@ -195,6 +195,29 @@ legal-move fuzzing, and a measured device performance budget.
 - Kept the initial policy fixed and conservative without adaptive reduction
   formulas.
 
+## Slice 12: deterministic search benchmarking
+
+- Added a standalone CSV benchmark executable under `packages/checkers_ai`
+  rather than adding timing-sensitive assertions to the unit-test suite.
+- Added deterministic opening, quiet middlegame, tactical capture, branching
+  capture, king-heavy, and near-endgame fixtures.
+- Added default-preserving controls for tactical move ordering and killer/history
+  learning so individual search stages can be compared honestly.
+- Compared baseline alpha-beta, tactical ordering, TT, quiescence, iterative full
+  windows, aspiration, killer/history, PVS, LMR, and current defaults at depth
+  five with fresh per-run state.
+- Recorded moves, available exact scores, completion, nodes, quiescence work,
+  descriptive timing/NPS, TT activity, aspiration retries, PVS activity,
+  killer/history activity, and LMR activity.
+- Required completed configurations to match the applicable static or quiescent
+  correctness baseline and made mismatches fail the benchmark process.
+- Confirmed all 60 snapshot runs completed and matched. Killer/history produced
+  the largest aggregate node reduction; aspiration and PVS were modest; tactical
+  ordering strongly helped branching captures; the cold fixed-depth TT had no
+  hits; and conservative LMR increased depth-5 aggregate work.
+- Documented methodology, full node-count results, interpretation, limitations,
+  and the separate benchmark command in `docs/ai-search-benchmarks.md`.
+
 ## Remaining work
 
 - Ten documented difficulty profiles.

@@ -116,7 +116,9 @@ final class MoveOrderingHeuristics {
 }
 
 final class MoveOrdering {
-  const MoveOrdering();
+  const MoveOrdering({this.useTacticalOrdering = true});
+
+  final bool useTacticalOrdering;
 
   List<Move> order(
     GameState state,
@@ -139,16 +141,18 @@ final class MoveOrdering {
       if (preferredComparison != 0) {
         return preferredComparison;
       }
-      final captureComparison = right.move.captureCount.compareTo(
-        left.move.captureCount,
-      );
-      if (captureComparison != 0) {
-        return captureComparison;
-      }
-      final promotionComparison = _boolScore(_promotes(state, right.move))
-          .compareTo(_boolScore(_promotes(state, left.move)));
-      if (promotionComparison != 0) {
-        return promotionComparison;
+      if (useTacticalOrdering) {
+        final captureComparison = right.move.captureCount.compareTo(
+          left.move.captureCount,
+        );
+        if (captureComparison != 0) {
+          return captureComparison;
+        }
+        final promotionComparison = _boolScore(_promotes(state, right.move))
+            .compareTo(_boolScore(_promotes(state, left.move)));
+        if (promotionComparison != 0) {
+          return promotionComparison;
+        }
       }
       final killerComparison = left.killerRank.compareTo(right.killerRank);
       if (killerComparison != 0) {
