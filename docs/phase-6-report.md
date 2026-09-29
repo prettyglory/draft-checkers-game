@@ -169,6 +169,32 @@ legal-move fuzzing, and a measured device performance budget.
   and interrupted iterative search.
 - Did not add Late Move Reductions in this slice.
 
+## Slice 11: conservative Late Move Reductions
+
+- Added configurable Late Move Reductions to fixed-depth and iterative normal
+  search, enabled by default with a disabled mode for baseline comparison.
+- Applied a one-ply reduction only from the third ordered move at non-PV nodes
+  with at least three plies remaining.
+- Excluded captures, promotions, first moves, transposition-table best moves,
+  killer moves, PV nodes, shallow nodes, and positions with forcing captures.
+- Used the existing PVS null window for reduced probes when PVS is enabled and a
+  normal alpha-beta window when it is disabled.
+- Re-searched every reduced result that could improve the active alpha or beta
+  bound at full depth and with the full current window before accepting it.
+- Prevented nodes with accepted unverified reduced results from writing a
+  full-depth transposition entry; reduced child searches remain keyed and stored
+  only at their actual reduced depth.
+- Charged reduced probes and full-depth verification searches through the
+  existing node, duration, and cancellation checks.
+- Added candidate, reduction, reduced-search, full-depth re-search, and reduced
+  cutoff diagnostics with iterative and aspiration-attempt aggregation.
+- Verified quiet-move reduction; capture, promotion, first-move, PV, shallow,
+  TT-best, and killer protection; promising-move verification; baseline move and
+  exact-score equality; determinism; PVS, aspiration, quiescence, and TT safety;
+  and budget, cancellation, and legal-fallback behavior.
+- Kept the initial policy fixed and conservative without adaptive reduction
+  formulas.
+
 ## Remaining work
 
 - Ten documented difficulty profiles.

@@ -60,6 +60,72 @@ final class PrincipalVariationSearchDiagnostics {
   }
 }
 
+final class LateMoveReductionConfig {
+  LateMoveReductionConfig({
+    this.enabled = true,
+    this.reduction = 1,
+    this.minimumDepth = 3,
+    this.minimumMoveIndex = 2,
+  }) {
+    if (reduction <= 0) {
+      throw ArgumentError.value(reduction, 'reduction', 'Must be positive.');
+    }
+    if (minimumDepth <= reduction) {
+      throw ArgumentError.value(
+        minimumDepth,
+        'minimumDepth',
+        'Must leave at least one ply after reduction.',
+      );
+    }
+    if (minimumMoveIndex < 1) {
+      throw ArgumentError.value(
+        minimumMoveIndex,
+        'minimumMoveIndex',
+        'Must protect the first ordered move.',
+      );
+    }
+  }
+
+  LateMoveReductionConfig.disabled()
+    : enabled = false,
+      reduction = 1,
+      minimumDepth = 3,
+      minimumMoveIndex = 2;
+
+  final bool enabled;
+  final int reduction;
+  final int minimumDepth;
+
+  /// Zero-based index of the first move eligible for reduction.
+  final int minimumMoveIndex;
+}
+
+final class LateMoveReductionDiagnostics {
+  const LateMoveReductionDiagnostics({
+    this.candidates = 0,
+    this.reductionsApplied = 0,
+    this.reducedSearches = 0,
+    this.fullDepthResearches = 0,
+    this.reducedSearchCutoffs = 0,
+  });
+
+  final int candidates;
+  final int reductionsApplied;
+  final int reducedSearches;
+  final int fullDepthResearches;
+  final int reducedSearchCutoffs;
+
+  LateMoveReductionDiagnostics plus(LateMoveReductionDiagnostics other) {
+    return LateMoveReductionDiagnostics(
+      candidates: candidates + other.candidates,
+      reductionsApplied: reductionsApplied + other.reductionsApplied,
+      reducedSearches: reducedSearches + other.reducedSearches,
+      fullDepthResearches: fullDepthResearches + other.fullDepthResearches,
+      reducedSearchCutoffs: reducedSearchCutoffs + other.reducedSearchCutoffs,
+    );
+  }
+}
+
 final class AiSearchRequest {
   AiSearchRequest({
     required this.state,
@@ -86,6 +152,7 @@ final class AiSearchMetadata {
     this.aspiration = const AspirationDiagnostics(),
     this.moveOrdering = const MoveOrderingDiagnostics(),
     this.principalVariationSearch = const PrincipalVariationSearchDiagnostics(),
+    this.lateMoveReductions = const LateMoveReductionDiagnostics(),
   }) {
     if (strategyId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -111,6 +178,7 @@ final class AiSearchMetadata {
   final AspirationDiagnostics aspiration;
   final MoveOrderingDiagnostics moveOrdering;
   final PrincipalVariationSearchDiagnostics principalVariationSearch;
+  final LateMoveReductionDiagnostics lateMoveReductions;
 }
 
 final class AiSearchResult {

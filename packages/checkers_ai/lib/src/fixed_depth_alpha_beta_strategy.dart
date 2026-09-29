@@ -15,8 +15,10 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     TranspositionTable? transpositionTable,
     this.maxQuiescenceDepth = 8,
     this.usePrincipalVariationSearch = true,
+    LateMoveReductionConfig? lateMoveReductions,
   }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine),
-       transpositionTable = transpositionTable ?? TranspositionTable() {
+       transpositionTable = transpositionTable ?? TranspositionTable(),
+       lateMoveReductions = lateMoveReductions ?? LateMoveReductionConfig() {
     if (maxQuiescenceDepth < 0) {
       throw ArgumentError.value(
         maxQuiescenceDepth,
@@ -34,6 +36,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
   final TranspositionTable transpositionTable;
   final int maxQuiescenceDepth;
   final bool usePrincipalVariationSearch;
+  final LateMoveReductionConfig lateMoveReductions;
 
   @override
   String get id => strategyId;
@@ -78,6 +81,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       perspective,
       heuristics,
       usePrincipalVariationSearch,
+      lateMoveReductions,
     );
     var bestMove = request.legalMoves.first;
     var bestScore = -_infinity;
@@ -102,6 +106,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             rootAlpha + 1,
             context,
             1,
+            false,
           );
           if (score > rootAlpha && score < beta) {
             context.recordPvsFullWindowResearch();
@@ -113,6 +118,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
               beta,
               context,
               1,
+              true,
             );
           } else if (score >= beta) {
             context.recordPvsCutoff();
@@ -129,6 +135,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             beta,
             context,
             1,
+            firstMove,
           );
         }
         firstMove = false;
@@ -174,6 +181,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             orderingDiagnosticsBefore,
           ),
           principalVariationSearch: context.pvsDiagnostics,
+          lateMoveReductions: context.lmrDiagnostics,
         ),
       ),
       score: bestScore,
@@ -189,6 +197,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     int beta,
     _SearchContext context,
     int ply,
+    bool isPrincipalVariationNode,
   ) {
     context.visitNode();
     if (depth == 0) {
@@ -248,10 +257,56 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     if (state.activeSide == perspective) {
       var value = -_infinity;
       var firstMove = true;
-      for (final move in moves) {
+      var hasUnverifiedReduction = false;
+      for (var moveIndex = 0; moveIndex < moves.length; moveIndex += 1) {
+        final move = moves[moveIndex];
         final child = rulesEngine.applyMove(state, move);
         late int score;
-        if (context.usePrincipalVariationSearch && !firstMove) {
+        final reduction = _lateMoveReduction(
+          state: state,
+          move: move,
+          moveIndex: moveIndex,
+          depth: depth,
+          ply: ply,
+          isPrincipalVariationNode: isPrincipalVariationNode,
+          forcingPosition: moves.first.isCapture,
+          preferredMoveId: cached?.bestMoveId,
+          context: context,
+        );
+        if (reduction > 0) {
+          context.recordLmrReduction();
+          if (context.usePrincipalVariationSearch) {
+            context.recordPvsNarrowWindowSearch();
+          }
+          score = _alphaBeta(
+            child,
+            depth - 1 - reduction,
+            perspective,
+            alpha,
+            context.usePrincipalVariationSearch ? alpha + 1 : beta,
+            context,
+            ply + 1,
+            false,
+          );
+          if (score > alpha) {
+            if (score >= beta) {
+              context.recordLmrReducedSearchCutoff();
+            }
+            context.recordLmrFullDepthResearch();
+            score = _alphaBeta(
+              child,
+              depth - 1,
+              perspective,
+              alpha,
+              beta,
+              context,
+              ply + 1,
+              isPrincipalVariationNode,
+            );
+          } else {
+            hasUnverifiedReduction = true;
+          }
+        } else if (context.usePrincipalVariationSearch && !firstMove) {
           context.recordPvsNarrowWindowSearch();
           score = _alphaBeta(
             child,
@@ -261,6 +316,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             alpha + 1,
             context,
             ply + 1,
+            false,
           );
           if (score > alpha && score < beta) {
             context.recordPvsFullWindowResearch();
@@ -272,6 +328,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
               beta,
               context,
               ply + 1,
+              isPrincipalVariationNode,
             );
           } else if (score >= beta) {
             context.recordPvsCutoff();
@@ -288,6 +345,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             beta,
             context,
             ply + 1,
+            isPrincipalVariationNode,
           );
         }
         firstMove = false;
@@ -309,13 +367,62 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
         }
       }
       result = value;
+      if (hasUnverifiedReduction) {
+        bestMoveId = null;
+      }
     } else {
       var value = _infinity;
       var firstMove = true;
-      for (final move in moves) {
+      var hasUnverifiedReduction = false;
+      for (var moveIndex = 0; moveIndex < moves.length; moveIndex += 1) {
+        final move = moves[moveIndex];
         final child = rulesEngine.applyMove(state, move);
         late int score;
-        if (context.usePrincipalVariationSearch && !firstMove) {
+        final reduction = _lateMoveReduction(
+          state: state,
+          move: move,
+          moveIndex: moveIndex,
+          depth: depth,
+          ply: ply,
+          isPrincipalVariationNode: isPrincipalVariationNode,
+          forcingPosition: moves.first.isCapture,
+          preferredMoveId: cached?.bestMoveId,
+          context: context,
+        );
+        if (reduction > 0) {
+          context.recordLmrReduction();
+          if (context.usePrincipalVariationSearch) {
+            context.recordPvsNarrowWindowSearch();
+          }
+          score = _alphaBeta(
+            child,
+            depth - 1 - reduction,
+            perspective,
+            context.usePrincipalVariationSearch ? beta - 1 : alpha,
+            beta,
+            context,
+            ply + 1,
+            false,
+          );
+          if (score < beta) {
+            if (score <= alpha) {
+              context.recordLmrReducedSearchCutoff();
+            }
+            context.recordLmrFullDepthResearch();
+            score = _alphaBeta(
+              child,
+              depth - 1,
+              perspective,
+              alpha,
+              beta,
+              context,
+              ply + 1,
+              isPrincipalVariationNode,
+            );
+          } else {
+            hasUnverifiedReduction = true;
+          }
+        } else if (context.usePrincipalVariationSearch && !firstMove) {
           context.recordPvsNarrowWindowSearch();
           score = _alphaBeta(
             child,
@@ -325,6 +432,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             beta,
             context,
             ply + 1,
+            false,
           );
           if (score < beta && score > alpha) {
             context.recordPvsFullWindowResearch();
@@ -336,6 +444,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
               beta,
               context,
               ply + 1,
+              isPrincipalVariationNode,
             );
           } else if (score <= alpha) {
             context.recordPvsCutoff();
@@ -352,6 +461,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             beta,
             context,
             ply + 1,
+            isPrincipalVariationNode,
           );
         }
         firstMove = false;
@@ -373,14 +483,56 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
         }
       }
       result = value;
+      if (hasUnverifiedReduction) {
+        bestMoveId = null;
+      }
     }
     final bound = result <= alphaOriginal
         ? TranspositionBound.upper
         : result >= betaOriginal
         ? TranspositionBound.lower
         : TranspositionBound.exact;
-    context.store(key, depth, result, bound, bestMoveId);
+    if (bestMoveId != null) {
+      context.store(key, depth, result, bound, bestMoveId);
+    }
     return result;
+  }
+
+  int _lateMoveReduction({
+    required GameState state,
+    required Move move,
+    required int moveIndex,
+    required int depth,
+    required int ply,
+    required bool isPrincipalVariationNode,
+    required bool forcingPosition,
+    required String? preferredMoveId,
+    required _SearchContext context,
+  }) {
+    final config = context.lateMoveReductions;
+    if (!config.enabled ||
+        isPrincipalVariationNode ||
+        depth < config.minimumDepth ||
+        moveIndex < config.minimumMoveIndex ||
+        forcingPosition ||
+        move.isCapture ||
+        _promotes(state, move)) {
+      return 0;
+    }
+    context.recordLmrCandidate();
+    if (move.id == preferredMoveId ||
+        context.orderingHeuristics.killerRank(ply, move) != null) {
+      return 0;
+    }
+    return config.reduction;
+  }
+
+  static bool _promotes(GameState state, Move move) {
+    final piece = state.board.pieceById(move.pieceId);
+    if (piece == null || piece.rank == PieceRank.king) return false;
+    return piece.side == PlayerSide.dark
+        ? move.destination.row == state.boardSize - 1
+        : move.destination.row == 0;
   }
 
   int _quiescence(
@@ -543,6 +695,7 @@ final class _SearchContext {
     this.perspective,
     this.orderingHeuristics,
     this.usePrincipalVariationSearch,
+    this.lateMoveReductions,
   ) : stopwatch = Stopwatch()..start();
 
   final AiSearchRequest request;
@@ -552,6 +705,7 @@ final class _SearchContext {
   final PlayerSide perspective;
   final MoveOrderingHeuristics orderingHeuristics;
   final bool usePrincipalVariationSearch;
+  final LateMoveReductionConfig lateMoveReductions;
   final Stopwatch stopwatch;
   int nodesExamined = 0;
   int quiescenceNodes = 0;
@@ -561,6 +715,11 @@ final class _SearchContext {
   int pvsNarrowWindowSearches = 0;
   int pvsFullWindowResearches = 0;
   int pvsCutoffs = 0;
+  int lmrCandidates = 0;
+  int lmrReductionsApplied = 0;
+  int lmrReducedSearches = 0;
+  int lmrFullDepthResearches = 0;
+  int lmrReducedSearchCutoffs = 0;
   SearchStopReason stopReason = SearchStopReason.completed;
 
   TranspositionKey keyFor(
@@ -586,6 +745,32 @@ final class _SearchContext {
         fullWindowResearches: pvsFullWindowResearches,
         cutoffs: pvsCutoffs,
       );
+
+  LateMoveReductionDiagnostics get lmrDiagnostics =>
+      LateMoveReductionDiagnostics(
+        candidates: lmrCandidates,
+        reductionsApplied: lmrReductionsApplied,
+        reducedSearches: lmrReducedSearches,
+        fullDepthResearches: lmrFullDepthResearches,
+        reducedSearchCutoffs: lmrReducedSearchCutoffs,
+      );
+
+  void recordLmrCandidate() {
+    lmrCandidates += 1;
+  }
+
+  void recordLmrReduction() {
+    lmrReductionsApplied += 1;
+    lmrReducedSearches += 1;
+  }
+
+  void recordLmrFullDepthResearch() {
+    lmrFullDepthResearches += 1;
+  }
+
+  void recordLmrReducedSearchCutoff() {
+    lmrReducedSearchCutoffs += 1;
+  }
 
   void recordPvsFirstMoveFullWindowSearch() {
     pvsFirstMoveFullWindowSearches += 1;

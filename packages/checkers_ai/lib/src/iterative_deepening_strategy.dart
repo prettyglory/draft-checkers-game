@@ -18,6 +18,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     int maxQuiescenceDepth = 8,
     AspirationWindowConfig? aspirationWindow,
     bool usePrincipalVariationSearch = true,
+    LateMoveReductionConfig? lateMoveReductions,
   }) : aspirationWindow = aspirationWindow ?? AspirationWindowConfig(),
        _fixedDepth = FixedDepthAlphaBetaStrategy(
          rulesEngine: rulesEngine,
@@ -25,6 +26,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
          transpositionTable: transpositionTable,
          maxQuiescenceDepth: maxQuiescenceDepth,
          usePrincipalVariationSearch: usePrincipalVariationSearch,
+         lateMoveReductions: lateMoveReductions,
        );
 
   static const strategyId = 'alpha-beta-iterative';
@@ -54,6 +56,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     var quiescence = const QuiescenceDiagnostics();
     var ordering = const MoveOrderingDiagnostics();
     var pvs = const PrincipalVariationSearchDiagnostics();
+    var lmr = const LateMoveReductionDiagnostics();
     final orderingHeuristics = MoveOrderingHeuristics();
     var previousScore = 0;
     var hasPreviousScore = false;
@@ -135,6 +138,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         quiescence = quiescence.plus(result.metadata.quiescence);
         ordering = ordering.plus(result.metadata.moveOrdering);
         pvs = pvs.plus(result.metadata.principalVariationSearch);
+        lmr = lmr.plus(result.metadata.lateMoveReductions);
         if (result.metadata.completedDepth != depth) {
           stopReason = result.metadata.stopReason;
           break depthLoop;
@@ -177,6 +181,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         ),
         moveOrdering: ordering,
         principalVariationSearch: pvs,
+        lateMoveReductions: lmr,
       ),
     );
   }
