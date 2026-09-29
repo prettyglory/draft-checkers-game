@@ -126,6 +126,24 @@ legal-move fuzzing, and a measured device performance budget.
   transposition compatibility, quiescence compatibility, and iterative
   regression behavior.
 
+## Slice 9: killer and history move ordering
+
+- Added two deterministic killer-move slots per normal-search ply for quiet
+  moves that cause alpha-beta cutoffs.
+- Added side-aware quiet-move history scores with a squared remaining-depth
+  bonus so deeper cutoffs receive greater ordering weight.
+- Kept transposition preferences, captures, and promotions ahead of learned
+  quiet-move priorities, with stable move IDs as the final tie breaker.
+- Scoped heuristic state to one fixed-depth request while sharing it across all
+  iterative depths and aspiration re-searches in the same request.
+- Excluded captures and quiescence search from killer/history learning.
+- Added killer/history hit and update counts plus reused quiet-cutoff diagnostics
+  to search metadata, including iterative-attempt aggregation.
+- Verified two-slot replacement, ply-local killers, cross-ply history reuse,
+  tactical priority, independent-request reset, iterative and aspiration reuse,
+  deterministic final moves, quiescence compatibility, budgets, and
+  cancellation.
+
 ## Remaining work
 
 - Ten documented difficulty profiles.

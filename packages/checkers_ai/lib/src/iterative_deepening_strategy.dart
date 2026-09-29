@@ -4,6 +4,7 @@ import 'ai_search.dart';
 import 'aspiration_window.dart';
 import 'cancellation.dart';
 import 'fixed_depth_alpha_beta_strategy.dart';
+import 'move_ordering.dart';
 import 'position_evaluator.dart';
 import 'search_budget.dart';
 import 'search_request_validator.dart';
@@ -49,6 +50,8 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     var stopReason = SearchStopReason.depthLimit;
     var transposition = const TranspositionDiagnostics();
     var quiescence = const QuiescenceDiagnostics();
+    var ordering = const MoveOrderingDiagnostics();
+    final orderingHeuristics = MoveOrderingHeuristics();
     var previousScore = 0;
     var hasPreviousScore = false;
     var aspirationAttempts = 0;
@@ -121,11 +124,13 @@ final class IterativeDeepeningStrategy implements AiStrategy {
           ),
           alpha: alpha,
           beta: beta,
+          orderingHeuristics: orderingHeuristics,
         );
         final result = iteration.result;
         totalNodes += result.metadata.nodesExamined;
         transposition = transposition.plus(result.metadata.transposition);
         quiescence = quiescence.plus(result.metadata.quiescence);
+        ordering = ordering.plus(result.metadata.moveOrdering);
         if (result.metadata.completedDepth != depth) {
           stopReason = result.metadata.stopReason;
           break depthLoop;
@@ -166,6 +171,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
           maximumWindowWidth: maximumWindowWidth,
           fullWindowFallback: fullWindowFallback,
         ),
+        moveOrdering: ordering,
       ),
     );
   }

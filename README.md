@@ -20,8 +20,10 @@ beginner strategy, weighted evaluation, fixed-depth alpha-beta, iterative
 deepening, deterministic tactical move ordering, and a history-safe
 transposition table. Bounded capture-only quiescence search prevents evaluation
 in the middle of forcing exchanges, while configurable aspiration windows focus
-later iterative searches around the previous exact score. Ten difficulty
-profiles, isolate execution, and device performance evidence remain in progress.
+later iterative searches around the previous exact score. Request-local killer
+moves and depth-weighted history scores now prioritize quiet moves that have
+already caused cutoffs. Ten difficulty profiles, isolate execution, and device
+performance evidence remain in progress.
 
 ## Repository layout
 

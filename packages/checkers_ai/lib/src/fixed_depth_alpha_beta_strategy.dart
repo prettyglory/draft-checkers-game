@@ -50,6 +50,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     AiSearchRequest request, {
     required int alpha,
     required int beta,
+    MoveOrderingHeuristics? orderingHeuristics,
   }) async {
     if (alpha < minimumScore || beta > maximumScore || alpha >= beta) {
       throw ArgumentError(
@@ -65,12 +66,15 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
 
     final perspective = request.state.activeSide;
     final diagnosticsBefore = transpositionTable.diagnostics;
+    final heuristics = orderingHeuristics ?? MoveOrderingHeuristics();
+    final orderingDiagnosticsBefore = heuristics.diagnostics;
     final context = _SearchContext(
       request,
       transpositionTable,
       transpositionTable.nextGeneration(),
       evaluator.weights,
       perspective,
+      heuristics,
     );
     var bestMove = request.legalMoves.first;
     var bestScore = -_infinity;
@@ -90,6 +94,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           rootAlpha,
           beta,
           context,
+          1,
         );
         if (score > bestScore) {
           bestScore = score;
@@ -129,6 +134,9 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
             diagnosticsBefore,
           ),
           quiescence: context.quiescenceDiagnostics,
+          moveOrdering: heuristics.diagnostics.difference(
+            orderingDiagnosticsBefore,
+          ),
         ),
       ),
       score: bestScore,
@@ -143,6 +151,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     int alpha,
     int beta,
     _SearchContext context,
+    int ply,
   ) {
     context.visitNode();
     if (depth == 0) {
@@ -188,6 +197,8 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       state,
       rulesEngine.legalMoves(state),
       preferredMoveId: cached?.bestMoveId,
+      heuristics: context.orderingHeuristics,
+      ply: ply,
     );
     if (moves.isEmpty) {
       final score = evaluator.evaluate(state, perspective).score;
@@ -208,6 +219,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           alpha,
           beta,
           context,
+          ply + 1,
         );
         if (score > value) {
           value = score;
@@ -217,6 +229,12 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           alpha = value;
         }
         if (alpha >= beta) {
+          context.orderingHeuristics.recordQuietCutoff(
+            state: state,
+            move: move,
+            ply: ply,
+            remainingDepth: depth,
+          );
           break;
         }
       }
@@ -232,6 +250,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           alpha,
           beta,
           context,
+          ply + 1,
         );
         if (score < value) {
           value = score;
@@ -241,6 +260,12 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           beta = value;
         }
         if (alpha >= beta) {
+          context.orderingHeuristics.recordQuietCutoff(
+            state: state,
+            move: move,
+            ply: ply,
+            remainingDepth: depth,
+          );
           break;
         }
       }
@@ -413,6 +438,7 @@ final class _SearchContext {
     this.generation,
     this.weights,
     this.perspective,
+    this.orderingHeuristics,
   ) : stopwatch = Stopwatch()..start();
 
   final AiSearchRequest request;
@@ -420,6 +446,7 @@ final class _SearchContext {
   final int generation;
   final EvaluationWeights weights;
   final PlayerSide perspective;
+  final MoveOrderingHeuristics orderingHeuristics;
   final Stopwatch stopwatch;
   int nodesExamined = 0;
   int quiescenceNodes = 0;
