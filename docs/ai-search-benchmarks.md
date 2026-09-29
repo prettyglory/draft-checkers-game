@@ -2,8 +2,9 @@
 
 ## Purpose
 
-The benchmark measures deterministic search work across the Phase 6 search
-stack. It is evidence about node efficiency, not a wall-clock performance gate.
+The benchmark measures deterministic search work and evaluator effects across
+the Phase 6 search stack. It is evidence about node efficiency and reproducible
+move choice, not a wall-clock performance gate.
 Timing and nodes per second are emitted for local profiling, but CI should not
 assert either because scheduler load, runtime warm-up, and hardware vary.
 
@@ -36,6 +37,11 @@ Checkers rules, with Dark to move:
 | Branching capture | Competing one-jump and multi-jump capture branches |
 | King-heavy | Four kings with broad forward/backward mobility |
 | Near-endgame | One king against one man |
+| King vs king | Separated kings with no immediate capture |
+| King plus man vs king | A material-advantage conversion ending |
+| Multiple kings | Two kings per side with broad mobility |
+| Promotion race | One man per side, each close to promotion |
+| Low-material tactical ending | A king chooses between capturing a man or king |
 
 ## Configurations
 
@@ -54,18 +60,40 @@ heuristic state for every fixture:
 | `pvs` | Principal Variation Search |
 | `lmr` | Conservative one-ply Late Move Reductions |
 | `current-full` | Current defaults; intentionally duplicates `lmr` as a drift check |
+| `current-full-endgame` | Current defaults with endgame-aware evaluation |
 
 The first four rows are cumulative fixed-depth configurations. Later rows are
 cumulative iterative configurations. `iterative-full-window` is included as the
 necessary control for evaluating aspiration and later iterative optimizations.
 Quiescence changes frontier semantics, so its score is compared to quiescent
-configurations rather than to the static-frontier baseline.
+configurations rather than to the static-frontier baseline. The endgame-aware
+row is verified against a separate fixed-depth search with the same evaluator;
+it is not required to match the existing evaluator's score or move.
+
+The endgame-aware evaluator activates when total material is at or below its
+configurable threshold, six pieces by default. Its default integer weights are:
+
+| Term | Weight | Meaning |
+| --- | ---: | --- |
+| King activity | 2 | Rewards a king for reducing Chebyshev distance to the nearest opposing piece |
+| King centralization | 5 | Rewards each square of distance from the nearest board edge |
+| Promotion proximity | 6 | Rewards each row of a remaining man's progress toward its king row |
+| Endgame mobility | 3 | Rewards each authoritative legal turn for the active side |
+| Trapped piece | 20 | Penalizes a piece with no adjacent move and no legal first capture step |
+| Edge safety | 2 | Rewards an uncrowned man occupying a protected edge file |
+| Conversion pressure | 10 | Scales material-unit advantage by scarcity below the threshold |
+| Draw risk | 8 | Discounts a material lead as repetition/no-progress pressure approaches a draw |
+
+Kings count as two material units and men as one only for conversion pressure;
+the original configurable material score remains unchanged. Qualifying completed
+draws are neutralized to zero only when the rules engine has already declared
+the draw; completed wins receive no added endgame heuristic terms.
 
 ## Metrics
 
-Each CSV row records fixture/configuration, completion status, selected move,
-exact score from an exact fixed-depth run, completed depth, total and quiescence
-nodes, elapsed microseconds, descriptive nodes per second, TT
+Each CSV row records fixture/configuration/evaluator, completion status, selected
+move, exact score from an exact fixed-depth run, completed depth, total and
+quiescence nodes, elapsed microseconds, descriptive nodes per second, TT
 probes/hits/cutoffs, PVS probes/re-searches, aspiration retries, killer/history
 hits, and LMR reductions/re-searches. Incomplete budget-limited results are
 explicitly labeled and excluded from completed-result correctness checks.
@@ -93,6 +121,32 @@ timing variation while node counts remained identical.
 
 All 60 searches completed depth five and passed their applicable move/score
 correctness check.
+
+### Endgame evaluator comparison
+
+The harness now contains eleven fixtures and eleven configurations, for 121
+completed depth-5 rows. The table compares the two `current-full` evaluator
+rows; a second run reproduced every listed move, score, depth, and node count.
+
+| Fixture | Existing move | Existing score | Existing nodes | Endgame-aware move | Endgame-aware score | Endgame-aware nodes |
+| --- | --- | ---: | ---: | --- | ---: | ---: |
+| Opening | `21-30` | -14 | 2,201 | `21-30` | -14 | 2,201 |
+| Quiet middlegame | `21-32` | 17 | 660 | `21-32` | 54 | 556 |
+| Tactical capture | `21-43` | 100,242 | 62 | `21-43` | 100,242 | 62 |
+| Branching capture | `23-45-67` | 45 | 55 | `23-45-67` | 62 | 61 |
+| King-heavy | `43-54` | -12 | 1,636 | `43-34` | -24 | 1,651 |
+| Near-endgame | `21-12` | 59 | 214 | `21-12` | 104 | 238 |
+| King vs king | `21-32` | -6 | 341 | `21-32` | -8 | 314 |
+| King plus man vs king | `43-52` | 157 | 640 | `43-52` | 223 | 594 |
+| Multiple kings | `12-21` | -15 | 1,423 | `12-21` | -21 | 1,555 |
+| Promotion race | `50-61` | -6 | 28 | `50-61` | -7 | 28 |
+| Low-material tactical ending | `23-45` | 51 | 149 | `23-45` | 82 | 138 |
+| **Total** | | | **7,409** | | | **7,398** |
+
+The requested five dedicated ending fixtures total 2,581 nodes with the existing
+evaluator and 2,629 with endgame awareness. Node differences reflect changed
+scores, aspiration retries, ordering, and TT paths; they are not an evaluator
+quality metric.
 
 ## Interpretation
 
@@ -123,10 +177,18 @@ correctness check.
   aggressive; deeper profiling is required before tuning it.
 - `lmr` and `current-full` produced identical node and diagnostic counts. Their
   elapsed times differed, illustrating why node work is the primary comparison.
+- Endgame activation left the 24-piece opening exactly unchanged. It changed one
+  compared move: the king-heavy fixture selected `43-34`, retaining greater
+  central activity than the existing evaluator's `43-54`. This is an intended
+  heuristic preference, not proof of a forced-game-theoretic improvement.
+- Scores changed in every qualifying low-material fixture, while both evaluator
+  modes retained legal moves and completed depth five. The dedicated promotion
+  race and tactical ending retained their existing move choices.
 
 ## Limitations
 
-- Six fixtures are representative, not a complete game corpus.
+- Eleven fixtures are representative, not a complete endgame tablebase or game
+  corpus.
 - Depth five emphasizes shallow overhead and may understate benefits that appear
   only at deeper searches.
 - The TT starts cold for every fixture. Fixed-depth positions with few

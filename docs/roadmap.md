@@ -7,9 +7,9 @@ Phases 1-4 are complete. Phase 5 remains in progress. Phase 6 now has legal
 beginner selection, weighted evaluation, fixed/iterative alpha-beta, and
 tactical ordering, history-safe transpositions, bounded quiescence, and
 aspiration-window iterative search with killer/history quiet-move ordering and
-Principal Variation Search plus conservative Late Move Reductions; profiles,
-isolate execution, and device performance evidence remain. Deterministic
-search-work benchmarking is complete.
+Principal Variation Search plus conservative Late Move Reductions and
+endgame-aware evaluation; profiles, isolate execution, and device performance
+evidence remain. Deterministic search-work benchmarking is complete.
 
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ search-work benchmarking is complete.
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
 | 5. Single player (in progress) | Authoritative local session complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus 21 Flutter regression/integration tests; end-to-end persistence evidence pending |
-| 6. AI levels (in progress) | Contracts, beginner strategy, evaluation, fixed/iterative alpha-beta with PVS and conservative LMR, cancellation, tactical and learned ordering, history-safe transpositions, bounded quiescence, aspiration windows, and deterministic benchmarking complete; ten profiles, isolate worker, and integration remain | 88 AI tests plus six-position, ten-configuration depth-5 benchmarks cover correctness and search work; fuzzing and measured device performance pending |
+| 6. AI levels (in progress) | Contracts, beginner strategy, endgame-aware evaluation, fixed/iterative alpha-beta with PVS and conservative LMR, cancellation, tactical and learned ordering, history-safe transpositions, bounded quiescence, aspiration windows, and deterministic benchmarking complete; ten profiles, isolate worker, and integration remain | 98 AI tests plus eleven-position, eleven-configuration depth-5 benchmarks cover correctness, evaluation comparison, and search work; fuzzing and measured device performance pending |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |
 | 9. Same-device | Two-player handoff/orientation, rematch | Full local match and restoration tests |

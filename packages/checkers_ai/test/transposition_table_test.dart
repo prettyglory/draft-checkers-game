@@ -64,9 +64,18 @@ void main() {
       perspective: PlayerSide.dark,
       weights: EvaluationWeights(king: 200),
     );
+    final endgameAware = TranspositionKey.fromState(
+      state: state,
+      perspective: PlayerSide.dark,
+      evaluatorKey: PositionEvaluator(
+        rulesEngine: engine,
+        endgameWeights: EndgameEvaluationWeights(),
+      ).cacheKey,
+    );
 
     expect(dark, isNot(light));
     expect(dark, isNot(weighted));
+    expect(dark, isNot(endgameAware));
   });
 
   test('keeps deeper entries instead of weaker replacements', () {

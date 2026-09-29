@@ -74,7 +74,8 @@ legal-move fuzzing, and a measured device performance budget.
 - Added bounded exact, lower-bound, and upper-bound entries with searched depth,
   score, best move, and generation metadata.
 - Keyed entries with the full canonical snapshot hash, evaluation perspective,
-  and all evaluation weights.
+  and the complete evaluator configuration, including endgame activation and
+  weights.
 - Included piece identities, side to move, revision/ply, complete repetition
   history, ruleset counters, status, and outcome through `GameStateCodec`.
 - Protected deeper entries from weaker replacement and preferred exact entries
@@ -218,10 +219,41 @@ legal-move fuzzing, and a measured device performance budget.
 - Documented methodology, full node-count results, interpretation, limitations,
   and the separate benchmark command in `docs/ai-search-benchmarks.md`.
 
+## Slice 13: endgame-aware evaluation
+
+- Kept the existing evaluator as the default and added optional immutable
+  endgame weights with a default activation threshold of six total pieces.
+- Preserved every existing material, advancement, center-control, mobility, and
+  terminal calculation exactly when endgame mode is disabled or above its
+  configured threshold.
+- Added separately reported king activity, king centralization, promotion
+  proximity, endgame mobility, trapped-piece, edge-safety, conversion-pressure,
+  and draw-risk terms.
+- Derived every feature from immutable piece coordinates, authoritative legal
+  moves, ruleset counters, repetition history, and completed outcomes. The
+  evaluator does not infer a draw or terminal result independently of the rules
+  engine.
+- Penalized individually trapped pieces only when they have neither an ordinary
+  move nor a first legal capture step under American man/king directions.
+- Increased conversion pressure with material-unit advantage and board scarcity;
+  reduced that advantage near the authoritative no-progress/repetition limits;
+  and normalized completed rules-engine draws to zero.
+- Included the full endgame configuration in transposition keys so tables cannot
+  reuse scores across evaluator modes or weight sets.
+- Added ten tests covering central kings, promotion races, trapped pieces,
+  mobility, material conversion, draw risk and completed draws, determinism,
+  perspective symmetry, inactive middlegame behavior, validation, and
+  evaluator-key separation.
+- Added five ending fixtures and an endgame-aware `current-full` comparison to
+  the deterministic harness. All 121 depth-5 rows completed and passed; repeated
+  evaluator runs reproduced moves, exact scores, depths, and node counts.
+- The endgame-aware evaluator changed the king-heavy choice from `43-54` to the
+  more central `43-34`. Other compared moves remained stable. Across all eleven
+  fixtures, current-full work changed from 7,409 to 7,398 nodes.
+
 ## Remaining work
 
 - Ten documented difficulty profiles.
-- Endgame knowledge.
 - Isolate worker and AI session actor integration.
 - Flutter mode/level selection and thinking state.
 - Legal-move fuzzing and measured low-end-device performance evidence.

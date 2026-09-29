@@ -79,7 +79,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       request,
       transpositionTable,
       transpositionTable.nextGeneration(),
-      evaluator.weights,
+      evaluator.cacheKey,
       perspective,
       heuristics,
       usePrincipalVariationSearch,
@@ -701,7 +701,7 @@ final class _SearchContext {
     this.request,
     this.table,
     this.generation,
-    this.weights,
+    this.evaluatorKey,
     this.perspective,
     this.orderingHeuristics,
     this.usePrincipalVariationSearch,
@@ -712,7 +712,7 @@ final class _SearchContext {
   final AiSearchRequest request;
   final TranspositionTable table;
   final int generation;
-  final EvaluationWeights weights;
+  final String evaluatorKey;
   final PlayerSide perspective;
   final MoveOrderingHeuristics orderingHeuristics;
   final bool usePrincipalVariationSearch;
@@ -740,7 +740,7 @@ final class _SearchContext {
   }) => TranspositionKey.fromState(
     state: state,
     perspective: perspective,
-    weights: weights,
+    evaluatorKey: evaluatorKey,
     nodeType: nodeType,
   );
 

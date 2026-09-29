@@ -12,15 +12,21 @@ final class TranspositionKey {
   factory TranspositionKey.fromState({
     required GameState state,
     required PlayerSide perspective,
-    required EvaluationWeights weights,
+    EvaluationWeights? weights,
+    String? evaluatorKey,
     TranspositionNodeType nodeType = TranspositionNodeType.normal,
   }) {
     final snapshot = const GameStateCodec().snapshotHash(state);
+    if (weights == null && evaluatorKey == null) {
+      throw ArgumentError('Evaluator weights or a cache key are required.');
+    }
+    final evaluation =
+        evaluatorKey ??
+        'evaluation-v2|${weights!.man}|${weights.king}|${weights.advancement}|'
+            '${weights.centerControl}|${weights.mobility}|${weights.terminal}|'
+            'endgame-off';
     return TranspositionKey._(
-      'tt-v2|${nodeType.name}|$snapshot|${perspective.name}|${weights.man}|'
-      '${weights.king}|'
-      '${weights.advancement}|${weights.centerControl}|${weights.mobility}|'
-      '${weights.terminal}',
+      'tt-v3|${nodeType.name}|$snapshot|${perspective.name}|$evaluation',
     );
   }
 

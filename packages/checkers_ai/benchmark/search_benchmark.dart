@@ -81,6 +81,12 @@ Future<_BenchmarkResult> _runBenchmark(
   final moveOrdering = MoveOrdering(
     useTacticalOrdering: configuration.useMoveOrdering,
   );
+  final evaluator = PositionEvaluator(
+    rulesEngine: _engine,
+    endgameWeights: configuration.useEndgameEvaluation
+        ? EndgameEvaluationWeights()
+        : null,
+  );
   late final AiSearchResult result;
   int? exactScore;
   var fixedVerificationMatches = true;
@@ -88,6 +94,7 @@ Future<_BenchmarkResult> _runBenchmark(
   if (configuration.useIterativeDeepening) {
     result = await IterativeDeepeningStrategy(
       rulesEngine: _engine,
+      evaluator: evaluator,
       moveOrdering: moveOrdering,
       transpositionTable: table,
       maxQuiescenceDepth: configuration.useQuiescence ? 8 : 0,
@@ -103,6 +110,7 @@ Future<_BenchmarkResult> _runBenchmark(
     final verification =
         await FixedDepthAlphaBetaStrategy(
           rulesEngine: _engine,
+          evaluator: evaluator,
           moveOrdering: moveOrdering,
           transpositionTable: TranspositionTable(
             maxEntries: configuration.useTranspositionTable ? 10000 : 0,
@@ -119,15 +127,19 @@ Future<_BenchmarkResult> _runBenchmark(
           alpha: FixedDepthAlphaBetaStrategy.minimumScore,
           beta: FixedDepthAlphaBetaStrategy.maximumScore,
         );
-    fixedVerificationMatches = verification.result.move.id == result.move.id;
-    if (verification.bound == TranspositionBound.exact &&
-        verification.result.metadata.completedDepth == depth) {
+    final verificationCompleted =
+        verification.bound == TranspositionBound.exact &&
+        verification.result.metadata.completedDepth == depth;
+    fixedVerificationMatches =
+        verificationCompleted && verification.result.move.id == result.move.id;
+    if (verificationCompleted) {
       exactScore = verification.score;
     }
   } else {
     final outcome =
         await FixedDepthAlphaBetaStrategy(
           rulesEngine: _engine,
+          evaluator: evaluator,
           moveOrdering: moveOrdering,
           transpositionTable: table,
           maxQuiescenceDepth: configuration.useQuiescence ? 8 : 0,
@@ -152,6 +164,9 @@ Future<_BenchmarkResult> _runBenchmark(
   return _BenchmarkResult(
     fixture: fixture.name,
     configuration: configuration.name,
+    evaluator: configuration.useEndgameEvaluation
+        ? 'endgame-aware'
+        : 'existing',
     moveId: result.move.id,
     exactScore: exactScore,
     requestedDepth: depth,
@@ -169,6 +184,10 @@ void _checkCorrectness(List<_BenchmarkResult> results) {
   );
   for (final result in results) {
     if (!result.completed) continue;
+    if (result.evaluator == 'endgame-aware') {
+      result.matchesReference = result.fixedVerificationMatches;
+      continue;
+    }
     final reference = switch (result.configuration) {
       'baseline-alpha-beta' ||
       'move-ordering' ||
@@ -255,6 +274,18 @@ List<_BenchmarkConfiguration> _configurations() {
       usePrincipalVariationSearch: true,
       useLateMoveReductions: true,
     ),
+    _BenchmarkConfiguration(
+      name: 'current-full-endgame',
+      useIterativeDeepening: true,
+      useMoveOrdering: true,
+      useTranspositionTable: true,
+      useQuiescence: true,
+      useAspirationWindows: true,
+      useKillerHistoryHeuristics: true,
+      usePrincipalVariationSearch: true,
+      useLateMoveReductions: true,
+      useEndgameEvaluation: true,
+    ),
   ];
 }
 
@@ -306,6 +337,45 @@ List<_BenchmarkFixture> _fixtures() {
         _piece('light-man', PlayerSide.light, 5, 4),
       ]),
     ),
+    _BenchmarkFixture(
+      'king-vs-king',
+      _state(<Piece>[
+        _piece('dark-king', PlayerSide.dark, 2, 1, rank: PieceRank.king),
+        _piece('light-king', PlayerSide.light, 5, 6, rank: PieceRank.king),
+      ]),
+    ),
+    _BenchmarkFixture(
+      'king-plus-man-vs-king',
+      _state(<Piece>[
+        _piece('dark-king', PlayerSide.dark, 2, 1, rank: PieceRank.king),
+        _piece('dark-man', PlayerSide.dark, 4, 3),
+        _piece('light-king', PlayerSide.light, 6, 5, rank: PieceRank.king),
+      ]),
+    ),
+    _BenchmarkFixture(
+      'multiple-kings',
+      _state(<Piece>[
+        _piece('dark-a', PlayerSide.dark, 1, 2, rank: PieceRank.king),
+        _piece('dark-b', PlayerSide.dark, 3, 4, rank: PieceRank.king),
+        _piece('light-a', PlayerSide.light, 4, 7, rank: PieceRank.king),
+        _piece('light-b', PlayerSide.light, 6, 1, rank: PieceRank.king),
+      ]),
+    ),
+    _BenchmarkFixture(
+      'promotion-race',
+      _state(<Piece>[
+        _piece('dark-man', PlayerSide.dark, 5, 0),
+        _piece('light-man', PlayerSide.light, 2, 7),
+      ]),
+    ),
+    _BenchmarkFixture(
+      'low-material-tactical-ending',
+      _state(<Piece>[
+        _piece('dark-king', PlayerSide.dark, 2, 3, rank: PieceRank.king),
+        _piece('light-man', PlayerSide.light, 3, 2),
+        _piece('light-king', PlayerSide.light, 3, 4, rank: PieceRank.king),
+      ]),
+    ),
   ];
 }
 
@@ -353,6 +423,7 @@ final class _BenchmarkConfiguration {
     this.useKillerHistoryHeuristics = false,
     this.usePrincipalVariationSearch = false,
     this.useLateMoveReductions = false,
+    this.useEndgameEvaluation = false,
   });
 
   final String name;
@@ -364,12 +435,14 @@ final class _BenchmarkConfiguration {
   final bool useKillerHistoryHeuristics;
   final bool usePrincipalVariationSearch;
   final bool useLateMoveReductions;
+  final bool useEndgameEvaluation;
 }
 
 final class _BenchmarkResult {
   _BenchmarkResult({
     required this.fixture,
     required this.configuration,
+    required this.evaluator,
     required this.moveId,
     required this.exactScore,
     required this.requestedDepth,
@@ -378,13 +451,14 @@ final class _BenchmarkResult {
   });
 
   static const csvHeader =
-      'fixture,configuration,status,move,exact_score,completed_depth,nodes,'
+      'fixture,configuration,evaluator,status,move,exact_score,completed_depth,nodes,'
       'quiescence_nodes,elapsed_us,nodes_per_second,tt_probes,tt_hits,'
       'tt_cutoffs,pvs_narrow,pvs_researches,aspiration_retries,killer_hits,'
       'history_hits,lmr_reductions,lmr_researches,correct';
 
   final String fixture;
   final String configuration;
+  final String evaluator;
   final String moveId;
   final int? exactScore;
   final int requestedDepth;
@@ -406,6 +480,7 @@ final class _BenchmarkResult {
     return <Object?>[
       fixture,
       configuration,
+      evaluator,
       completed ? 'complete' : 'incomplete-${metadata.stopReason.name}',
       moveId,
       exactScore ?? '',

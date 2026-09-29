@@ -25,9 +25,11 @@ moves and depth-weighted history scores now prioritize quiet moves that have
 already caused cutoffs. Principal Variation Search gives the first ordered move
 a full window, probes later moves with null windows, and fully re-searches only
 promising improvements. Conservative one-ply Late Move Reductions shorten only
-safe non-PV quiet branches and verify any promising result at full depth. Ten
-difficulty profiles, isolate execution, and device performance evidence remain
-in progress.
+safe non-PV quiet branches and verify any promising result at full depth. An
+optional endgame evaluator activates at six or fewer pieces and adds explicit
+king activity/centralization, promotion, mobility, trapping, edge safety,
+conversion, and draw-risk terms without changing middlegame scores. Ten
+difficulty profiles, isolate execution, and device performance evidence remain.
 
 Deterministic search-work benchmarks can be run separately with
 `dart run benchmark/search_benchmark.dart --depth=5` from `packages/checkers_ai`.

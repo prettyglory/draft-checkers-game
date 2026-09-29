@@ -180,6 +180,13 @@ center-control, active-side mobility, and terminal terms. Every evaluation is
 from a requested player's perspective, and terminal wins/losses dominate the
 combined heuristic weights.
 
+An optional endgame layer activates at a configurable total-piece threshold and
+adds explicit king activity/centralization, promotion proximity, mobility,
+trapping, edge safety, material-conversion, and draw-risk terms. It consumes only
+immutable state and authoritative rules data. Above the threshold, every added
+term is zero and the original evaluation is unchanged; the complete evaluator
+configuration is part of each transposition key.
+
 The first search implementation is deterministic fixed-depth alpha-beta. It
 expands states only through the rules engine, keeps engine move ordering for
 stable tie-breaking, reports expanded nodes, and returns a legal fallback when
