@@ -129,7 +129,10 @@ void main() {
 
   test('does not extend quiet stable frontier positions', () async {
     final position = engine.createInitialState();
-    final strategy = FixedDepthAlphaBetaStrategy(rulesEngine: engine);
+    final strategy = FixedDepthAlphaBetaStrategy(
+      rulesEngine: engine,
+      usePrincipalVariationSearch: false,
+    );
 
     final result = await strategy.chooseMove(request(engine, position));
 

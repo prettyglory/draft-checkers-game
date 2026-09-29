@@ -34,6 +34,32 @@ final class QuiescenceDiagnostics {
   }
 }
 
+final class PrincipalVariationSearchDiagnostics {
+  const PrincipalVariationSearchDiagnostics({
+    this.firstMoveFullWindowSearches = 0,
+    this.narrowWindowSearches = 0,
+    this.fullWindowResearches = 0,
+    this.cutoffs = 0,
+  });
+
+  final int firstMoveFullWindowSearches;
+  final int narrowWindowSearches;
+  final int fullWindowResearches;
+  final int cutoffs;
+
+  PrincipalVariationSearchDiagnostics plus(
+    PrincipalVariationSearchDiagnostics other,
+  ) {
+    return PrincipalVariationSearchDiagnostics(
+      firstMoveFullWindowSearches:
+          firstMoveFullWindowSearches + other.firstMoveFullWindowSearches,
+      narrowWindowSearches: narrowWindowSearches + other.narrowWindowSearches,
+      fullWindowResearches: fullWindowResearches + other.fullWindowResearches,
+      cutoffs: cutoffs + other.cutoffs,
+    );
+  }
+}
+
 final class AiSearchRequest {
   AiSearchRequest({
     required this.state,
@@ -59,6 +85,7 @@ final class AiSearchMetadata {
     this.quiescence = const QuiescenceDiagnostics(),
     this.aspiration = const AspirationDiagnostics(),
     this.moveOrdering = const MoveOrderingDiagnostics(),
+    this.principalVariationSearch = const PrincipalVariationSearchDiagnostics(),
   }) {
     if (strategyId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -83,6 +110,7 @@ final class AiSearchMetadata {
   final QuiescenceDiagnostics quiescence;
   final AspirationDiagnostics aspiration;
   final MoveOrderingDiagnostics moveOrdering;
+  final PrincipalVariationSearchDiagnostics principalVariationSearch;
 }
 
 final class AiSearchResult {

@@ -144,6 +144,31 @@ legal-move fuzzing, and a measured device performance budget.
   deterministic final moves, quiescence compatibility, budgets, and
   cancellation.
 
+## Slice 10: Principal Variation Search
+
+- Added configurable Principal Variation Search to fixed-depth and iterative
+  normal-search nodes, enabled by default with a baseline alpha-beta mode for
+  direct correctness comparison.
+- Searched each node's first ordered move with the full alpha-beta window and
+  later moves with a one-point null window.
+- Re-searched a later move with the full current window only when its null-window
+  result improved the bound without causing a cutoff.
+- Preserved fail-soft alpha-beta cutoffs and classified every transposition entry
+  against the actual window used by that search, so null-window failures remain
+  lower or upper bounds until a genuinely exact full search replaces them.
+- Kept quiescence on its existing full alpha-beta path while allowing PVS probes
+  and re-searches to reuse its exact, history-safe transposition entries.
+- Charged all probes and re-searches through the existing node, duration, and
+  cancellation checks and retained the last completed iterative depth when a
+  re-search was interrupted.
+- Added first-move full-window, null-window, full re-search, and direct PVS
+  cutoff diagnostics with iterative and aspiration-attempt aggregation.
+- Verified move and exact-score equality with baseline alpha-beta, deterministic
+  fail-high and fail-low behavior, narrow-bound and exact TT storage, aspiration,
+  quiescence, killer/history ordering, legal fallback, budgets, cancellation,
+  and interrupted iterative search.
+- Did not add Late Move Reductions in this slice.
+
 ## Remaining work
 
 - Ten documented difficulty profiles.

@@ -22,7 +22,9 @@ transposition table. Bounded capture-only quiescence search prevents evaluation
 in the middle of forcing exchanges, while configurable aspiration windows focus
 later iterative searches around the previous exact score. Request-local killer
 moves and depth-weighted history scores now prioritize quiet moves that have
-already caused cutoffs. Ten difficulty profiles, isolate execution, and device
+already caused cutoffs. Principal Variation Search gives the first ordered move
+a full window, probes later moves with null windows, and fully re-searches only
+promising improvements. Ten difficulty profiles, isolate execution, and device
 performance evidence remain in progress.
 
 ## Repository layout

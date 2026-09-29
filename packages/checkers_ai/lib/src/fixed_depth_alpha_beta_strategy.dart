@@ -14,6 +14,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     this.moveOrdering = const MoveOrdering(),
     TranspositionTable? transpositionTable,
     this.maxQuiescenceDepth = 8,
+    this.usePrincipalVariationSearch = true,
   }) : evaluator = evaluator ?? PositionEvaluator(rulesEngine: rulesEngine),
        transpositionTable = transpositionTable ?? TranspositionTable() {
     if (maxQuiescenceDepth < 0) {
@@ -32,6 +33,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
   final MoveOrdering moveOrdering;
   final TranspositionTable transpositionTable;
   final int maxQuiescenceDepth;
+  final bool usePrincipalVariationSearch;
 
   @override
   String get id => strategyId;
@@ -75,6 +77,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       evaluator.weights,
       perspective,
       heuristics,
+      usePrincipalVariationSearch,
     );
     var bestMove = request.legalMoves.first;
     var bestScore = -_infinity;
@@ -83,19 +86,52 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     final betaOriginal = beta;
     var rootAlpha = alpha;
 
+    var firstMove = true;
     for (final move in moveOrdering.order(request.state, request.legalMoves)) {
       try {
         context.checkLimits();
         final nextState = rulesEngine.applyMove(request.state, move);
-        final score = _alphaBeta(
-          nextState,
-          depth - 1,
-          perspective,
-          rootAlpha,
-          beta,
-          context,
-          1,
-        );
+        late int score;
+        if (usePrincipalVariationSearch && !firstMove) {
+          context.recordPvsNarrowWindowSearch();
+          score = _alphaBeta(
+            nextState,
+            depth - 1,
+            perspective,
+            rootAlpha,
+            rootAlpha + 1,
+            context,
+            1,
+          );
+          if (score > rootAlpha && score < beta) {
+            context.recordPvsFullWindowResearch();
+            score = _alphaBeta(
+              nextState,
+              depth - 1,
+              perspective,
+              rootAlpha,
+              beta,
+              context,
+              1,
+            );
+          } else if (score >= beta) {
+            context.recordPvsCutoff();
+          }
+        } else {
+          if (usePrincipalVariationSearch) {
+            context.recordPvsFirstMoveFullWindowSearch();
+          }
+          score = _alphaBeta(
+            nextState,
+            depth - 1,
+            perspective,
+            rootAlpha,
+            beta,
+            context,
+            1,
+          );
+        }
+        firstMove = false;
         if (score > bestScore) {
           bestScore = score;
           bestMove = move;
@@ -137,6 +173,7 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           moveOrdering: heuristics.diagnostics.difference(
             orderingDiagnosticsBefore,
           ),
+          principalVariationSearch: context.pvsDiagnostics,
         ),
       ),
       score: bestScore,
@@ -210,17 +247,50 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     String? bestMoveId;
     if (state.activeSide == perspective) {
       var value = -_infinity;
+      var firstMove = true;
       for (final move in moves) {
         final child = rulesEngine.applyMove(state, move);
-        final score = _alphaBeta(
-          child,
-          depth - 1,
-          perspective,
-          alpha,
-          beta,
-          context,
-          ply + 1,
-        );
+        late int score;
+        if (context.usePrincipalVariationSearch && !firstMove) {
+          context.recordPvsNarrowWindowSearch();
+          score = _alphaBeta(
+            child,
+            depth - 1,
+            perspective,
+            alpha,
+            alpha + 1,
+            context,
+            ply + 1,
+          );
+          if (score > alpha && score < beta) {
+            context.recordPvsFullWindowResearch();
+            score = _alphaBeta(
+              child,
+              depth - 1,
+              perspective,
+              alpha,
+              beta,
+              context,
+              ply + 1,
+            );
+          } else if (score >= beta) {
+            context.recordPvsCutoff();
+          }
+        } else {
+          if (context.usePrincipalVariationSearch) {
+            context.recordPvsFirstMoveFullWindowSearch();
+          }
+          score = _alphaBeta(
+            child,
+            depth - 1,
+            perspective,
+            alpha,
+            beta,
+            context,
+            ply + 1,
+          );
+        }
+        firstMove = false;
         if (score > value) {
           value = score;
           bestMoveId = move.id;
@@ -241,17 +311,50 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
       result = value;
     } else {
       var value = _infinity;
+      var firstMove = true;
       for (final move in moves) {
         final child = rulesEngine.applyMove(state, move);
-        final score = _alphaBeta(
-          child,
-          depth - 1,
-          perspective,
-          alpha,
-          beta,
-          context,
-          ply + 1,
-        );
+        late int score;
+        if (context.usePrincipalVariationSearch && !firstMove) {
+          context.recordPvsNarrowWindowSearch();
+          score = _alphaBeta(
+            child,
+            depth - 1,
+            perspective,
+            beta - 1,
+            beta,
+            context,
+            ply + 1,
+          );
+          if (score < beta && score > alpha) {
+            context.recordPvsFullWindowResearch();
+            score = _alphaBeta(
+              child,
+              depth - 1,
+              perspective,
+              alpha,
+              beta,
+              context,
+              ply + 1,
+            );
+          } else if (score <= alpha) {
+            context.recordPvsCutoff();
+          }
+        } else {
+          if (context.usePrincipalVariationSearch) {
+            context.recordPvsFirstMoveFullWindowSearch();
+          }
+          score = _alphaBeta(
+            child,
+            depth - 1,
+            perspective,
+            alpha,
+            beta,
+            context,
+            ply + 1,
+          );
+        }
+        firstMove = false;
         if (score < value) {
           value = score;
           bestMoveId = move.id;
@@ -439,6 +542,7 @@ final class _SearchContext {
     this.weights,
     this.perspective,
     this.orderingHeuristics,
+    this.usePrincipalVariationSearch,
   ) : stopwatch = Stopwatch()..start();
 
   final AiSearchRequest request;
@@ -447,11 +551,16 @@ final class _SearchContext {
   final EvaluationWeights weights;
   final PlayerSide perspective;
   final MoveOrderingHeuristics orderingHeuristics;
+  final bool usePrincipalVariationSearch;
   final Stopwatch stopwatch;
   int nodesExamined = 0;
   int quiescenceNodes = 0;
   int quiescenceCutoffs = 0;
   int maximumQuiescenceDepth = 0;
+  int pvsFirstMoveFullWindowSearches = 0;
+  int pvsNarrowWindowSearches = 0;
+  int pvsFullWindowResearches = 0;
+  int pvsCutoffs = 0;
   SearchStopReason stopReason = SearchStopReason.completed;
 
   TranspositionKey keyFor(
@@ -469,6 +578,30 @@ final class _SearchContext {
     cutoffs: quiescenceCutoffs,
     maximumDepth: maximumQuiescenceDepth,
   );
+
+  PrincipalVariationSearchDiagnostics get pvsDiagnostics =>
+      PrincipalVariationSearchDiagnostics(
+        firstMoveFullWindowSearches: pvsFirstMoveFullWindowSearches,
+        narrowWindowSearches: pvsNarrowWindowSearches,
+        fullWindowResearches: pvsFullWindowResearches,
+        cutoffs: pvsCutoffs,
+      );
+
+  void recordPvsFirstMoveFullWindowSearch() {
+    pvsFirstMoveFullWindowSearches += 1;
+  }
+
+  void recordPvsNarrowWindowSearch() {
+    pvsNarrowWindowSearches += 1;
+  }
+
+  void recordPvsFullWindowResearch() {
+    pvsFullWindowResearches += 1;
+  }
+
+  void recordPvsCutoff() {
+    pvsCutoffs += 1;
+  }
 
   void recordQuiescenceNode(int depth) {
     quiescenceNodes += 1;
