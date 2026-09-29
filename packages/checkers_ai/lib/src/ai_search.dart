@@ -8,6 +8,30 @@ import 'transposition_table.dart';
 
 enum SearchStopReason { completed, nodeLimit, depthLimit, timeLimit, cancelled }
 
+final class QuiescenceDiagnostics {
+  const QuiescenceDiagnostics({
+    this.nodes = 0,
+    this.cutoffs = 0,
+    this.maximumDepth = 0,
+  });
+
+  final int nodes;
+  final int cutoffs;
+
+  /// Recursive edges from the depth-frontier node, which is depth zero.
+  final int maximumDepth;
+
+  QuiescenceDiagnostics plus(QuiescenceDiagnostics other) {
+    return QuiescenceDiagnostics(
+      nodes: nodes + other.nodes,
+      cutoffs: cutoffs + other.cutoffs,
+      maximumDepth: maximumDepth > other.maximumDepth
+          ? maximumDepth
+          : other.maximumDepth,
+    );
+  }
+}
+
 final class AiSearchRequest {
   AiSearchRequest({
     required this.state,
@@ -30,6 +54,7 @@ final class AiSearchMetadata {
     required this.elapsed,
     required this.stopReason,
     this.transposition = const TranspositionDiagnostics(),
+    this.quiescence = const QuiescenceDiagnostics(),
   }) {
     if (strategyId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -51,6 +76,7 @@ final class AiSearchMetadata {
   final Duration elapsed;
   final SearchStopReason stopReason;
   final TranspositionDiagnostics transposition;
+  final QuiescenceDiagnostics quiescence;
 }
 
 final class AiSearchResult {

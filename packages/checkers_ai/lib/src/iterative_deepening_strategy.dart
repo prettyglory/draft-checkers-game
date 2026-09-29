@@ -13,10 +13,12 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     required this.rulesEngine,
     PositionEvaluator? evaluator,
     TranspositionTable? transpositionTable,
+    int maxQuiescenceDepth = 8,
   }) : _fixedDepth = FixedDepthAlphaBetaStrategy(
          rulesEngine: rulesEngine,
          evaluator: evaluator,
          transpositionTable: transpositionTable,
+         maxQuiescenceDepth: maxQuiescenceDepth,
        );
 
   static const strategyId = 'alpha-beta-iterative';
@@ -42,6 +44,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     var totalNodes = 0;
     var stopReason = SearchStopReason.depthLimit;
     var transposition = const TranspositionDiagnostics();
+    var quiescence = const QuiescenceDiagnostics();
 
     for (var depth = 1; depth <= maximumDepth; depth += 1) {
       _throwIfCancelled(request);
@@ -76,6 +79,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
       );
       totalNodes += iteration.metadata.nodesExamined;
       transposition = transposition.plus(iteration.metadata.transposition);
+      quiescence = quiescence.plus(iteration.metadata.quiescence);
       if (iteration.metadata.completedDepth == depth) {
         bestMove = iteration.move;
         completedDepth = depth;
@@ -95,6 +99,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         elapsed: stopwatch.elapsed,
         stopReason: stopReason,
         transposition: transposition,
+        quiescence: quiescence,
       ),
     );
   }

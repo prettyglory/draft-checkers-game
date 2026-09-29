@@ -4,6 +4,8 @@ import 'position_evaluator.dart';
 
 enum TranspositionBound { exact, lower, upper }
 
+enum TranspositionNodeType { normal, quiescence }
+
 final class TranspositionKey {
   TranspositionKey._(this.value);
 
@@ -11,10 +13,12 @@ final class TranspositionKey {
     required GameState state,
     required PlayerSide perspective,
     required EvaluationWeights weights,
+    TranspositionNodeType nodeType = TranspositionNodeType.normal,
   }) {
     final snapshot = const GameStateCodec().snapshotHash(state);
     return TranspositionKey._(
-      'tt-v1|$snapshot|${perspective.name}|${weights.man}|${weights.king}|'
+      'tt-v2|${nodeType.name}|$snapshot|${perspective.name}|${weights.man}|'
+      '${weights.king}|'
       '${weights.advancement}|${weights.centerControl}|${weights.mobility}|'
       '${weights.terminal}',
     );

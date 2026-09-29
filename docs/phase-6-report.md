@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - search foundation and history-safe caching complete
+Status: In progress - search foundation, history-safe caching, and quiescence complete
 
 ## Documented outcome
 
@@ -86,6 +86,25 @@ legal-move fuzzing, and a measured device performance budget.
 - Verified history/counter separation, depth replacement, all bound types, warm
   reuse, deterministic cached/uncached selection, budgets, cancellation, and
   iterative correctness.
+
+## Slice 7: bounded quiescence search
+
+- Replaced static evaluation at the normal depth frontier with bounded
+  alpha-beta quiescence search.
+- Extended only authoritative capture moves, which are mandatory and include a
+  complete multi-jump turn under American Checkers rules.
+- Stopped immediately at terminal positions, quiet positions, or the configured
+  eight-capture-turn extension ceiling.
+- Charged every additional quiescence node to the existing node and duration
+  budgets and checked cancellation at every recursive node boundary.
+- Preserved deterministic tactical ordering and strict score tie handling.
+- Namespaced normal and quiescence transposition keys and stored remaining
+  quiescence depth so incompatible horizon values cannot be reused.
+- Added quiescence node, cutoff, and maximum recursive-edge-depth diagnostics,
+  including iterative-deepening aggregation.
+- Verified horizon avoidance, alternating forced captures, quiet and terminal
+  frontiers, cancellation, node/time ceilings, deterministic cached and
+  uncached results, transposition reuse, and the explicit extension cap.
 
 ## Remaining work
 
