@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - search foundation, history-safe caching, and quiescence complete
+Status: In progress - core iterative search refinements complete
 
 ## Documented outcome
 
@@ -105,6 +105,26 @@ legal-move fuzzing, and a measured device performance budget.
 - Verified horizon avoidance, alternating forced captures, quiet and terminal
   frontiers, cancellation, node/time ceilings, deterministic cached and
   uncached results, transposition reuse, and the explicit extension cap.
+
+## Slice 8: aspiration-window search
+
+- Added configurable aspiration windows to iterative depths after the first
+  full-window iteration.
+- Centered each narrow window on the previous fully completed exact score.
+- Classified root results as exact, lower-bound fail-high, or upper-bound
+  fail-low outcomes without publishing bounds as completed depth results.
+- Doubled the half-width after each failure and fell back to the full score
+  range after four configurable narrow attempts.
+- Counted every attempt and re-search against the shared node and duration
+  budgets and retained the last completed iteration when interrupted.
+- Preserved cancellation checks, deterministic root ordering, quiescence,
+  alpha-beta bounds, and history-safe transposition reuse across attempts.
+- Added attempt, fail-low, fail-high, re-search, maximum-width, and full-window
+  fallback diagnostics.
+- Verified in-window completion, both failure directions, repeated widening,
+  full-window equality, determinism, budget/cancellation interruption,
+  transposition compatibility, quiescence compatibility, and iterative
+  regression behavior.
 
 ## Remaining work
 

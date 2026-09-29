@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:checkers_engine/checkers_engine.dart';
 
 import 'cancellation.dart';
+import 'aspiration_window.dart';
 import 'search_budget.dart';
 import 'transposition_table.dart';
 
@@ -55,6 +56,7 @@ final class AiSearchMetadata {
     required this.stopReason,
     this.transposition = const TranspositionDiagnostics(),
     this.quiescence = const QuiescenceDiagnostics(),
+    this.aspiration = const AspirationDiagnostics(),
   }) {
     if (strategyId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -77,6 +79,7 @@ final class AiSearchMetadata {
   final SearchStopReason stopReason;
   final TranspositionDiagnostics transposition;
   final QuiescenceDiagnostics quiescence;
+  final AspirationDiagnostics aspiration;
 }
 
 final class AiSearchResult {

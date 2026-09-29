@@ -38,6 +38,24 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
 
   @override
   Future<AiSearchResult> chooseMove(AiSearchRequest request) async {
+    final outcome = await searchWithWindow(
+      request,
+      alpha: minimumScore,
+      beta: maximumScore,
+    );
+    return outcome.result;
+  }
+
+  Future<AlphaBetaSearchOutcome> searchWithWindow(
+    AiSearchRequest request, {
+    required int alpha,
+    required int beta,
+  }) async {
+    if (alpha < minimumScore || beta > maximumScore || alpha >= beta) {
+      throw ArgumentError(
+        'Search window must satisfy minimum <= alpha < beta <= maximum.',
+      );
+    }
     _throwIfCancelled(request);
     validateSearchRequest(rulesEngine, request);
     final depth = request.budget.maxDepth;
@@ -57,6 +75,9 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     var bestMove = request.legalMoves.first;
     var bestScore = -_infinity;
     var completed = true;
+    final alphaOriginal = alpha;
+    final betaOriginal = beta;
+    var rootAlpha = alpha;
 
     for (final move in moveOrdering.order(request.state, request.legalMoves)) {
       try {
@@ -66,13 +87,19 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
           nextState,
           depth - 1,
           perspective,
-          -_infinity,
-          _infinity,
+          rootAlpha,
+          beta,
           context,
         );
         if (score > bestScore) {
           bestScore = score;
           bestMove = move;
+        }
+        if (bestScore > rootAlpha) {
+          rootAlpha = bestScore;
+        }
+        if (rootAlpha >= beta) {
+          break;
         }
       } on _SearchLimitReached catch (limit) {
         context.stopReason = limit.reason;
@@ -82,21 +109,30 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     }
     context.stopwatch.stop();
 
-    return AiSearchResult(
-      move: bestMove,
-      metadata: AiSearchMetadata(
-        strategyId: id,
-        nodesExamined: context.nodesExamined,
-        completedDepth: completed ? depth : 0,
-        elapsed: context.stopwatch.elapsed,
-        stopReason: completed
-            ? SearchStopReason.depthLimit
-            : context.stopReason,
-        transposition: transpositionTable.diagnostics.difference(
-          diagnosticsBefore,
+    final bound = bestScore <= alphaOriginal
+        ? TranspositionBound.upper
+        : bestScore >= betaOriginal
+        ? TranspositionBound.lower
+        : TranspositionBound.exact;
+    return AlphaBetaSearchOutcome(
+      result: AiSearchResult(
+        move: bestMove,
+        metadata: AiSearchMetadata(
+          strategyId: id,
+          nodesExamined: context.nodesExamined,
+          completedDepth: completed ? depth : 0,
+          elapsed: context.stopwatch.elapsed,
+          stopReason: completed
+              ? SearchStopReason.depthLimit
+              : context.stopReason,
+          transposition: transpositionTable.diagnostics.difference(
+            diagnosticsBefore,
+          ),
+          quiescence: context.quiescenceDiagnostics,
         ),
-        quiescence: context.quiescenceDiagnostics,
       ),
+      score: bestScore,
+      bound: bound,
     );
   }
 
@@ -353,7 +389,21 @@ final class FixedDepthAlphaBetaStrategy implements AiStrategy {
     }
   }
 
-  static const _infinity = 1 << 30;
+  static const minimumScore = -(1 << 30);
+  static const maximumScore = 1 << 30;
+  static const _infinity = maximumScore;
+}
+
+final class AlphaBetaSearchOutcome {
+  const AlphaBetaSearchOutcome({
+    required this.result,
+    required this.score,
+    required this.bound,
+  });
+
+  final AiSearchResult result;
+  final int score;
+  final TranspositionBound bound;
 }
 
 final class _SearchContext {

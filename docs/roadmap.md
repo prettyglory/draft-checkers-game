@@ -5,8 +5,9 @@ manual acceptance of the changed flow, and a meaningful commit.
 
 Phases 1-4 are complete. Phase 5 remains in progress. Phase 6 now has legal
 beginner selection, weighted evaluation, fixed/iterative alpha-beta, and
-tactical ordering, history-safe transpositions, and bounded quiescence; profiles,
-isolate execution, and performance evidence remain.
+tactical ordering, history-safe transpositions, bounded quiescence, and
+aspiration-window iterative search; profiles, isolate execution, and performance
+evidence remain.
 
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
@@ -15,7 +16,7 @@ isolate execution, and performance evidence remain.
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
 | 5. Single player (in progress) | Authoritative local session complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus 21 Flutter regression/integration tests; end-to-end persistence evidence pending |
-| 6. AI levels (in progress) | Contracts, beginner strategy, evaluation, fixed/iterative alpha-beta, cancellation, ordering, history-safe transpositions, and bounded quiescence complete; ten profiles, isolate worker, and integration remain | 42 AI tests cover legality, determinism, tactics, budgets, cancellation, evaluation, ordering, cache safety, horizon avoidance, and forcing captures; fuzzing and device performance pending |
+| 6. AI levels (in progress) | Contracts, beginner strategy, evaluation, fixed/iterative alpha-beta, cancellation, ordering, history-safe transpositions, bounded quiescence, and aspiration windows complete; ten profiles, isolate worker, and integration remain | 52 AI tests cover legality, determinism, tactics, budgets, cancellation, evaluation, ordering, cache safety, horizon avoidance, forcing captures, and aspiration re-search; fuzzing and device performance pending |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |
 | 9. Same-device | Two-player handoff/orientation, rematch | Full local match and restoration tests |

@@ -2,6 +2,7 @@
 library;
 
 export 'src/ai_search.dart';
+export 'src/aspiration_window.dart';
 export 'src/beginner_strategy.dart';
 export 'src/cancellation.dart';
 export 'src/fixed_depth_alpha_beta_strategy.dart';

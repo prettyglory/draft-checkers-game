@@ -1,6 +1,7 @@
 import 'package:checkers_engine/checkers_engine.dart';
 
 import 'ai_search.dart';
+import 'aspiration_window.dart';
 import 'cancellation.dart';
 import 'fixed_depth_alpha_beta_strategy.dart';
 import 'position_evaluator.dart';
@@ -14,7 +15,9 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     PositionEvaluator? evaluator,
     TranspositionTable? transpositionTable,
     int maxQuiescenceDepth = 8,
-  }) : _fixedDepth = FixedDepthAlphaBetaStrategy(
+    AspirationWindowConfig? aspirationWindow,
+  }) : aspirationWindow = aspirationWindow ?? AspirationWindowConfig(),
+       _fixedDepth = FixedDepthAlphaBetaStrategy(
          rulesEngine: rulesEngine,
          evaluator: evaluator,
          transpositionTable: transpositionTable,
@@ -24,6 +27,7 @@ final class IterativeDeepeningStrategy implements AiStrategy {
   static const strategyId = 'alpha-beta-iterative';
 
   final RulesEngine rulesEngine;
+  final AspirationWindowConfig aspirationWindow;
   final FixedDepthAlphaBetaStrategy _fixedDepth;
 
   @override
@@ -45,47 +49,101 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     var stopReason = SearchStopReason.depthLimit;
     var transposition = const TranspositionDiagnostics();
     var quiescence = const QuiescenceDiagnostics();
+    var previousScore = 0;
+    var hasPreviousScore = false;
+    var aspirationAttempts = 0;
+    var failLow = 0;
+    var failHigh = 0;
+    var reSearches = 0;
+    var maximumWindowWidth = 0;
+    var fullWindowFallback = false;
 
+    depthLoop:
     for (var depth = 1; depth <= maximumDepth; depth += 1) {
       _throwIfCancelled(request);
-      final remainingNodes = switch (request.budget.maxNodes) {
-        final limit? => limit - totalNodes,
-        null => null,
-      };
-      if (remainingNodes != null && remainingNodes <= 0) {
-        stopReason = SearchStopReason.nodeLimit;
-        break;
-      }
-      final remainingDuration = switch (request.budget.maxDuration) {
-        final limit? => limit - stopwatch.elapsed,
-        null => null,
-      };
-      if (remainingDuration != null && remainingDuration <= Duration.zero) {
-        stopReason = SearchStopReason.timeLimit;
-        break;
-      }
+      final useAspiration =
+          aspirationWindow.enabled && depth > 1 && hasPreviousScore;
+      var windowedAttempt = 0;
+      var halfWidth = aspirationWindow.initialHalfWidth;
 
-      final iteration = await _fixedDepth.chooseMove(
-        AiSearchRequest(
-          state: request.state,
-          legalMoves: request.legalMoves,
-          budget: SearchBudget(
-            maxDepth: depth,
-            maxNodes: remainingNodes,
-            maxDuration: remainingDuration,
+      while (true) {
+        _throwIfCancelled(request);
+        final remainingNodes = switch (request.budget.maxNodes) {
+          final limit? => limit - totalNodes,
+          null => null,
+        };
+        if (remainingNodes != null && remainingNodes <= 0) {
+          stopReason = SearchStopReason.nodeLimit;
+          break depthLoop;
+        }
+        final remainingDuration = switch (request.budget.maxDuration) {
+          final limit? => limit - stopwatch.elapsed,
+          null => null,
+        };
+        if (remainingDuration != null && remainingDuration <= Duration.zero) {
+          stopReason = SearchStopReason.timeLimit;
+          break depthLoop;
+        }
+
+        final fullWindow =
+            !useAspiration ||
+            windowedAttempt >= aspirationWindow.maxWindowedAttempts;
+        final alpha = fullWindow
+            ? FixedDepthAlphaBetaStrategy.minimumScore
+            : _clampScore(previousScore - halfWidth);
+        final beta = fullWindow
+            ? FixedDepthAlphaBetaStrategy.maximumScore
+            : _clampScore(previousScore + halfWidth);
+        if (useAspiration) {
+          aspirationAttempts += 1;
+          if (windowedAttempt > 0) {
+            reSearches += 1;
+          }
+          final width = beta - alpha;
+          if (width > maximumWindowWidth) {
+            maximumWindowWidth = width;
+          }
+          if (fullWindow) {
+            fullWindowFallback = true;
+          }
+        }
+
+        final iteration = await _fixedDepth.searchWithWindow(
+          AiSearchRequest(
+            state: request.state,
+            legalMoves: request.legalMoves,
+            budget: SearchBudget(
+              maxDepth: depth,
+              maxNodes: remainingNodes,
+              maxDuration: remainingDuration,
+            ),
+            cancellationToken: request.cancellationToken,
           ),
-          cancellationToken: request.cancellationToken,
-        ),
-      );
-      totalNodes += iteration.metadata.nodesExamined;
-      transposition = transposition.plus(iteration.metadata.transposition);
-      quiescence = quiescence.plus(iteration.metadata.quiescence);
-      if (iteration.metadata.completedDepth == depth) {
-        bestMove = iteration.move;
-        completedDepth = depth;
-      } else {
-        stopReason = iteration.metadata.stopReason;
-        break;
+          alpha: alpha,
+          beta: beta,
+        );
+        final result = iteration.result;
+        totalNodes += result.metadata.nodesExamined;
+        transposition = transposition.plus(result.metadata.transposition);
+        quiescence = quiescence.plus(result.metadata.quiescence);
+        if (result.metadata.completedDepth != depth) {
+          stopReason = result.metadata.stopReason;
+          break depthLoop;
+        }
+        if (iteration.bound == TranspositionBound.exact) {
+          bestMove = result.move;
+          completedDepth = depth;
+          previousScore = iteration.score;
+          hasPreviousScore = true;
+          continue depthLoop;
+        }
+        if (iteration.bound == TranspositionBound.upper) {
+          failLow += 1;
+        } else {
+          failHigh += 1;
+        }
+        windowedAttempt += 1;
+        halfWidth *= aspirationWindow.wideningFactor;
       }
     }
     stopwatch.stop();
@@ -100,6 +158,14 @@ final class IterativeDeepeningStrategy implements AiStrategy {
         stopReason: stopReason,
         transposition: transposition,
         quiescence: quiescence,
+        aspiration: AspirationDiagnostics(
+          attempts: aspirationAttempts,
+          failLow: failLow,
+          failHigh: failHigh,
+          reSearches: reSearches,
+          maximumWindowWidth: maximumWindowWidth,
+          fullWindowFallback: fullWindowFallback,
+        ),
       ),
     );
   }
@@ -108,5 +174,12 @@ final class IterativeDeepeningStrategy implements AiStrategy {
     if (request.cancellationToken.isCancelled) {
       throw const AiSearchCancelledException();
     }
+  }
+
+  static int _clampScore(int score) {
+    return score.clamp(
+      FixedDepthAlphaBetaStrategy.minimumScore,
+      FixedDepthAlphaBetaStrategy.maximumScore,
+    );
   }
 }

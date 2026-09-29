@@ -19,8 +19,9 @@ measurable search budgets and metadata, cancellation contracts, a seeded legal
 beginner strategy, weighted evaluation, fixed-depth alpha-beta, iterative
 deepening, deterministic tactical move ordering, and a history-safe
 transposition table. Bounded capture-only quiescence search prevents evaluation
-in the middle of forcing exchanges. Ten difficulty profiles, isolate execution,
-and device performance evidence remain in progress.
+in the middle of forcing exchanges, while configurable aspiration windows focus
+later iterative searches around the previous exact score. Ten difficulty
+profiles, isolate execution, and device performance evidence remain in progress.
 
 ## Repository layout
 
