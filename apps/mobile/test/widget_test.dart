@@ -2,7 +2,6 @@ import 'dart:ui' show SemanticsAction;
 
 import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
-import 'package:draft_game/app/draft_game_app.dart';
 import 'package:draft_game/app/theme/app_theme.dart';
 import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/game_board_screen.dart';
@@ -26,7 +25,14 @@ void main() {
     addTearDown(tester.view.reset);
     tester.platformDispatcher.textScaleFactorTestValue = textScaleFactor;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpWidget(child ?? const DraftGameApp());
+    await tester.pumpWidget(
+      child ??
+          MaterialApp(
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            home: const GameBoardScreen(),
+          ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -428,9 +434,9 @@ void main() {
       ),
     );
 
-    expect(find.byKey(const Key('difficulty-selector')), findsOneWidget);
+    expect(find.byKey(const Key('current-match-summary')), findsOneWidget);
+    expect(find.text('Human vs AI · Expert'), findsOneWidget);
     expect(find.text('Computer is thinking'), findsOneWidget);
-    expect(find.text('AI: Thinking'), findsOneWidget);
     expect(viewModel.selectablePieceIds, isEmpty);
     expect(runner.requests, hasLength(1));
   });

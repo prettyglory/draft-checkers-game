@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
+import 'package:draft_game/features/game/application/ai_turn_runner.dart';
 import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/checkers_board.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
@@ -14,8 +15,9 @@ const _lightActorId = 'local-light';
 GameBoardViewModel _createLocalViewModel(
   GameState? initialState,
   GameConfiguration configuration,
+  AiTurnRunner? aiTurnRunner,
 ) {
-  const engine = AmericanCheckersRulesEngine();
+  final engine = configuration.ruleset.createEngine();
   final session = InProcessGameSession(
     id: 'local-game',
     rulesEngine: engine,
@@ -32,6 +34,7 @@ GameBoardViewModel _createLocalViewModel(
       PlayerSide.light: _lightActorId,
     },
     configuration: configuration,
+    aiTurnRunner: aiTurnRunner,
   );
 }
 
@@ -40,12 +43,15 @@ class GameBoardScreen extends StatefulWidget {
     this.initialState,
     this.viewModel,
     this.configuration = const GameConfiguration(),
+    this.aiTurnRunner,
     super.key,
-  }) : assert(initialState == null || viewModel == null);
+  }) : assert(initialState == null || viewModel == null),
+       assert(aiTurnRunner == null || viewModel == null);
 
   final GameState? initialState;
   final GameBoardViewModel? viewModel;
   final GameConfiguration configuration;
+  final AiTurnRunner? aiTurnRunner;
 
   @override
   State<GameBoardScreen> createState() => _GameBoardScreenState();
@@ -61,7 +67,11 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     _ownsViewModel = widget.viewModel == null;
     _viewModel =
         widget.viewModel ??
-        _createLocalViewModel(widget.initialState, widget.configuration);
+        _createLocalViewModel(
+          widget.initialState,
+          widget.configuration,
+          widget.aiTurnRunner,
+        );
   }
 
   @override
@@ -318,7 +328,7 @@ class _GameInformation extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
-        _GameSetupControls(viewModel: viewModel),
+        _MatchSummary(configuration: viewModel.configuration),
         const SizedBox(height: 18),
         Text(
           'How to play',
@@ -338,19 +348,27 @@ class _GameInformation extends StatelessWidget {
           icon: const Icon(Icons.restart_alt_rounded),
           label: const Text('New game'),
         ),
+        if (Navigator.of(context).canPop()) ...<Widget>[
+          const SizedBox(height: 10),
+          TextButton.icon(
+            key: const Key('leave-match-button'),
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('Back to match setup'),
+          ),
+        ],
       ],
     );
   }
 }
 
-class _GameSetupControls extends StatelessWidget {
-  const _GameSetupControls({required this.viewModel});
+class _MatchSummary extends StatelessWidget {
+  const _MatchSummary({required this.configuration});
 
-  final GameBoardViewModel viewModel;
+  final GameConfiguration configuration;
 
   @override
   Widget build(BuildContext context) {
-    final configuration = viewModel.configuration;
     final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -363,102 +381,37 @@ class _GameSetupControls extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
-              'Game setup',
+              'Current match',
+              key: const Key('current-match-summary'),
               style: Theme.of(context).textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            SegmentedButton<GameMode>(
-              key: const Key('game-mode-selector'),
-              segments: const <ButtonSegment<GameMode>>[
-                ButtonSegment<GameMode>(
-                  value: GameMode.localTwoPlayer,
-                  label: Text('Two players'),
-                  icon: Icon(Icons.people_alt_rounded),
+            Row(
+              children: <Widget>[
+                Icon(
+                  configuration.mode == GameMode.localTwoPlayer
+                      ? Icons.people_alt_rounded
+                      : Icons.memory_rounded,
+                  color: scheme.primary,
                 ),
-                ButtonSegment<GameMode>(
-                  value: GameMode.humanVsAi,
-                  label: Text('Computer'),
-                  icon: Icon(Icons.memory_rounded),
-                ),
-              ],
-              selected: <GameMode>{configuration.mode},
-              onSelectionChanged: viewModel.canReset
-                  ? (selection) {
-                      viewModel.setGameMode(selection.single);
-                    }
-                  : null,
-            ),
-            if (configuration.mode == GameMode.humanVsAi) ...<Widget>[
-              const SizedBox(height: 12),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: DropdownButtonFormField<PlayerSide>(
-                      key: const Key('human-side-selector'),
-                      initialValue: configuration.humanSide,
-                      decoration: const InputDecoration(labelText: 'Your side'),
-                      items: const <DropdownMenuItem<PlayerSide>>[
-                        DropdownMenuItem<PlayerSide>(
-                          value: PlayerSide.dark,
-                          child: Text('Dark'),
-                        ),
-                        DropdownMenuItem<PlayerSide>(
-                          value: PlayerSide.light,
-                          child: Text('Light'),
-                        ),
-                      ],
-                      onChanged: viewModel.canReset
-                          ? (side) {
-                              if (side != null) viewModel.setHumanSide(side);
-                            }
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<AiDifficulty>(
-                      key: const Key('difficulty-selector'),
-                      initialValue: configuration.difficulty,
-                      decoration: const InputDecoration(
-                        labelText: 'Difficulty',
-                      ),
-                      items: AiDifficulty.values
-                          .map(
-                            (difficulty) => DropdownMenuItem<AiDifficulty>(
-                              value: difficulty,
-                              child: Text(difficulty.preset.label),
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: viewModel.canReset
-                          ? (difficulty) {
-                              if (difficulty != null) {
-                                viewModel.setDifficulty(difficulty);
-                              }
-                            }
-                          : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: <Widget>[
-                  Icon(
-                    viewModel.isAiThinking
-                        ? Icons.hourglass_top_rounded
-                        : Icons.memory_rounded,
-                    size: 18,
-                    color: scheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AI: ${viewModel.aiStateLabel}',
-                    key: const Key('ai-state-label'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    configuration.mode == GameMode.localTwoPlayer
+                        ? 'Human vs Human'
+                        : 'Human vs AI · ${configuration.difficulty.preset.label}',
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
-                ],
+                ),
+              ],
+            ),
+            if (configuration.mode == GameMode.humanVsAi) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                'You play ${configuration.humanSide == PlayerSide.dark ? 'Dark' : 'Light'} · AI: ${configuration.aiSide == PlayerSide.dark ? 'Dark' : 'Light'}',
+                key: const Key('match-side-summary'),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ],

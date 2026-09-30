@@ -30,11 +30,15 @@ optional endgame evaluator activates at six or fewer pieces and adds explicit
 king activity/centralization, promotion, mobility, trapping, edge safety,
 conversion, and draw-risk terms without changing middlegame scores.
 
-The Flutter board now supports local two-player and human-versus-computer games
-with side selection and five deterministic presets: Beginner, Easy, Medium,
-Hard, and Expert. AI search runs in a killable isolate, user input is disabled
-on the computer turn, and the selected move is submitted through the same
-authoritative `GameSession` command path as human play. Device profiling and
+The Flutter client now opens on a responsive match setup screen for local
+two-player or human-versus-computer games. Setup produces one typed match
+configuration containing the mode, American Checkers ruleset, human side, and
+one of five deterministic presets: Beginner, Easy, Medium, Hard, or Expert.
+Starting creates a fresh authoritative session and navigates to the board. AI
+search runs in a killable isolate, user input is disabled on the computer turn,
+and the selected move is submitted through the same authoritative `GameSession`
+command path as human play. Restart keeps the match configuration, while leaving
+the board disposes the match and cancels pending AI work. Device profiling and
 possible profile expansion remain.
 
 Deterministic search-work benchmarks can be run separately with

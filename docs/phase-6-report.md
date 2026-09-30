@@ -282,6 +282,26 @@ legal-move fuzzing, and a measured device performance budget.
   authoritative moves, reset cancellation, difficulty changes, side choice,
   blocked input, disposal, and visible thinking state.
 
+## Slice 15: Match setup flow
+
+- Added a responsive pre-match screen as the Flutter app entry point. Human vs
+  Human remains the default, while Human vs AI exposes side and all five existing
+  difficulty presets before a session is created.
+- Extended the typed `GameConfiguration` with a `GameRuleset` field. The setup
+  ViewModel owns draft selections, validates mode/ruleset and AI-only fields, and
+  emits a complete configuration without duplicating preset policy in widgets.
+- Made `Start Game` push a board route that constructs a fresh authoritative
+  `InProcessGameSession` and `GameBoardViewModel` from that configuration. The
+  board shows a read-only match summary rather than mutating setup mid-match.
+- Preserved local two-player commands and all board behavior. Restart continues
+  through `StartNewGameCommand` and retains the current configuration.
+- Verified the AI starts automatically when it owns opening Dark, board input is
+  blocked during that search, and leaving the route disposes the ViewModel and
+  cancels pending isolate work.
+- Added setup state, widget, navigation, lifecycle, accessibility, and selection
+  coverage plus phone/tablet light/dark setup goldens. Existing board regression
+  and golden coverage remains active.
+
 ## Remaining work
 
 - Legal-move fuzzing and measured low-end-device performance evidence.
