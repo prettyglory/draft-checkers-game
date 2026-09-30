@@ -184,20 +184,24 @@ change. The resulting flow is UI -> ViewModel -> GameSession/AI actor -> search
 -> engine, with `GameSession` remaining the state authority.
 
 Match setup is a separate presentation flow backed by `MatchSetupViewModel`.
-The setup state owns nullable draft selections and exposes a startable
-`GameConfiguration` only when mode, ruleset, and any AI-specific side/difficulty
-fields are complete. Widgets render that state but do not map difficulty presets
-or construct strategies. `GameConfiguration` is the typed handoff containing
-mode, human side, AI difficulty, and ruleset; its ruleset creates the matching
-engine at the board boundary.
+The setup state owns nullable mode and AI-specific draft selections and exposes a
+startable `GameConfiguration` only when required fields are complete. Widgets
+render that state but do not map difficulty presets or construct strategies.
+`GameConfiguration` is the typed handoff containing mode, human side, AI
+difficulty, and the currently supported American ruleset; its ruleset creates
+the matching engine at the board boundary.
 
 `Start Game` pushes a new `GameBoardScreen`. That route creates a fresh
 `InProcessGameSession` and `GameBoardViewModel` from the configuration. Session
 startup schedules the AI immediately when it owns Dark, the opening side.
-Restart sends `StartNewGameCommand` through the same session and retains the
-route's configuration. Popping the route disposes its ViewModel, session, and AI
-runner, killing any pending search before returning to setup. The flow remains
-UI -> ViewModel -> GameSession -> AI/Search -> Engine.
+Resignation, draw offer, draw acceptance/decline, and Restart are typed commands
+submitted through the ViewModel to `GameSession`; widgets never synthesize an
+outcome. Restart uses `StartNewGameCommand` on the current session, retaining the
+configuration while keeping revision monotonic. Rematch disposes that complete
+session/ViewModel/runner and creates a new set from the same configuration, so
+revision, history, outcome, draw state, and AI generation return to fresh-match
+values. Popping the route performs the same disposal before returning to setup.
+The flow remains UI -> ViewModel -> GameSession -> AI/Search -> Engine.
 
 Five immutable presets provide deterministic node/depth ceilings without
 hardware-dependent duration cutoffs:
@@ -210,8 +214,9 @@ hardware-dependent duration cutoffs:
 | Hard | 4 | 10,000 | Full search stack with conservative LMR |
 | Expert | 5 | 25,000 | Full stack plus endgame-aware evaluation |
 
-Reset and ViewModel disposal kill an active search isolate and invalidate its
-generation. A result is accepted only if revision, side, mode, and generation
+Terminal commands, unresolved draw offers, Restart, Rematch, and ViewModel
+disposal kill an active search isolate and invalidate its generation. A result is
+accepted only if revision, side, mode, draw state, game status, and generation
 still match the authoritative session snapshot.
 
 Static evaluation is expressed as explicit material, uncrowned advancement,

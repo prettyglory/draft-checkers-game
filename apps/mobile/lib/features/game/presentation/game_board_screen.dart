@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:checkers_ai/checkers_ai.dart';
@@ -12,14 +13,17 @@ import 'package:game_session/game_session.dart';
 const _darkActorId = 'local-dark';
 const _lightActorId = 'local-light';
 
+typedef AiTurnRunnerFactory = AiTurnRunner Function();
+
 GameBoardViewModel _createLocalViewModel(
+  String sessionId,
   GameState? initialState,
   GameConfiguration configuration,
-  AiTurnRunner? aiTurnRunner,
+  AiTurnRunnerFactory? aiTurnRunnerFactory,
 ) {
   final engine = configuration.ruleset.createEngine();
   final session = InProcessGameSession(
-    id: 'local-game',
+    id: sessionId,
     rulesEngine: engine,
     initialState: initialState ?? engine.createInitialState(),
     actorSides: const <String, PlayerSide>{
@@ -34,7 +38,7 @@ GameBoardViewModel _createLocalViewModel(
       PlayerSide.light: _lightActorId,
     },
     configuration: configuration,
-    aiTurnRunner: aiTurnRunner,
+    aiTurnRunner: aiTurnRunnerFactory?.call(),
   );
 }
 
@@ -43,35 +47,33 @@ class GameBoardScreen extends StatefulWidget {
     this.initialState,
     this.viewModel,
     this.configuration = const GameConfiguration(),
-    this.aiTurnRunner,
+    this.aiTurnRunnerFactory,
     super.key,
   }) : assert(initialState == null || viewModel == null),
-       assert(aiTurnRunner == null || viewModel == null);
+       assert(aiTurnRunnerFactory == null || viewModel == null);
 
   final GameState? initialState;
   final GameBoardViewModel? viewModel;
   final GameConfiguration configuration;
-  final AiTurnRunner? aiTurnRunner;
+  final AiTurnRunnerFactory? aiTurnRunnerFactory;
 
   @override
   State<GameBoardScreen> createState() => _GameBoardScreenState();
 }
 
 class _GameBoardScreenState extends State<GameBoardScreen> {
-  late final GameBoardViewModel _viewModel;
+  late GameBoardViewModel _viewModel;
   late final bool _ownsViewModel;
+  int _matchNumber = 1;
+  bool _rematching = false;
+  bool _dialogOpen = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
     _ownsViewModel = widget.viewModel == null;
-    _viewModel =
-        widget.viewModel ??
-        _createLocalViewModel(
-          widget.initialState,
-          widget.configuration,
-          widget.aiTurnRunner,
-        );
+    _viewModel = widget.viewModel ?? _createOwnedViewModel(widget.initialState);
   }
 
   @override
@@ -84,57 +86,226 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Theme.of(context).colorScheme.surface,
-              Theme.of(context).colorScheme.surfaceContainer,
-            ],
+    return PopScope<Object?>(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_confirmBackToSetup());
+      },
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Theme.of(context).colorScheme.surface,
+                Theme.of(context).colorScheme.surfaceContainer,
+              ],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: AnimatedBuilder(
-            animation: _viewModel,
-            builder: (context, _) {
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide =
-                      constraints.maxWidth >= 820 &&
-                      constraints.maxHeight >= 620;
-                  return wide
-                      ? _WideGameLayout(
-                          key: const Key('wide-game-layout'),
-                          viewModel: _viewModel,
-                          constraints: constraints,
-                        )
-                      : _PhoneGameLayout(
-                          key: const Key('phone-game-layout'),
-                          viewModel: _viewModel,
-                          maxWidth: constraints.maxWidth,
-                        );
-                },
-              );
-            },
+          child: SafeArea(
+            child: AnimatedBuilder(
+              animation: _viewModel,
+              builder: (context, _) {
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide =
+                        constraints.maxWidth >= 820 &&
+                        constraints.maxHeight >= 620;
+                    return wide
+                        ? _WideGameLayout(
+                            key: const Key('wide-game-layout'),
+                            viewModel: _viewModel,
+                            constraints: constraints,
+                            onRestart: _confirmRestart,
+                            onRematch: _ownsViewModel ? _rematch : null,
+                            onBackToSetup: _confirmBackToSetup,
+                            onResign: _confirmResignation,
+                          )
+                        : _PhoneGameLayout(
+                            key: const Key('phone-game-layout'),
+                            viewModel: _viewModel,
+                            maxWidth: constraints.maxWidth,
+                            onRestart: _confirmRestart,
+                            onRematch: _ownsViewModel ? _rematch : null,
+                            onBackToSetup: _confirmBackToSetup,
+                            onResign: _confirmResignation,
+                          );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
+
+  GameBoardViewModel _createOwnedViewModel(GameState? initialState) {
+    return _createLocalViewModel(
+      'local-game-$_matchNumber',
+      initialState,
+      widget.configuration,
+      widget.aiTurnRunnerFactory,
+    );
+  }
+
+  Future<void> _confirmRestart() async {
+    if (_dialogOpen || !mounted) return;
+    _dialogOpen = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restart current match?'),
+        content: const Text(
+          'The current position and result will be cleared. Your match settings will stay the same.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('confirm-restart-button'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Restart'),
+          ),
+        ],
+      ),
+    );
+    _dialogOpen = false;
+    if (confirmed ?? false) await _viewModel.restart();
+  }
+
+  Future<void> _confirmResignation() async {
+    if (_dialogOpen || !mounted || !viewModelActive) return;
+    _dialogOpen = true;
+    final side = await showDialog<PlayerSide>(
+      context: context,
+      builder: (context) {
+        final configuration = _viewModel.configuration;
+        if (configuration.mode == GameMode.humanVsAi) {
+          final humanSide = configuration.humanSide;
+          return AlertDialog(
+            title: const Text('Resign match?'),
+            content: Text(
+              '${_sideLabel(humanSide)} will resign and the computer will win.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const Key('confirm-resign-button'),
+                onPressed: () => Navigator.of(context).pop(humanSide),
+                child: const Text('Resign'),
+              ),
+            ],
+          );
+        }
+        return AlertDialog(
+          title: const Text('Which side resigns?'),
+          content: const Text('The other side will immediately win the match.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              key: const Key('resign-dark-button'),
+              onPressed: () => Navigator.of(context).pop(PlayerSide.dark),
+              child: const Text('Dark resigns'),
+            ),
+            FilledButton(
+              key: const Key('resign-light-button'),
+              onPressed: () => Navigator.of(context).pop(PlayerSide.light),
+              child: const Text('Light resigns'),
+            ),
+          ],
+        );
+      },
+    );
+    _dialogOpen = false;
+    if (side != null) await _viewModel.resign(side);
+  }
+
+  Future<void> _confirmBackToSetup() async {
+    if (_dialogOpen || !mounted) return;
+    var leave = true;
+    if (viewModelActive) {
+      _dialogOpen = true;
+      leave =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Leave active match?'),
+              content: const Text(
+                'This match will end and cannot be resumed. Your setup selections will remain available.',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Stay'),
+                ),
+                FilledButton(
+                  key: const Key('confirm-leave-button'),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Leave match'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      _dialogOpen = false;
+    }
+    if (leave && mounted) {
+      setState(() => _allowPop = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final popped = await Navigator.of(context).maybePop();
+      if (!popped && mounted) setState(() => _allowPop = false);
+    }
+  }
+
+  Future<void> _rematch() async {
+    if (_rematching || !_ownsViewModel) return;
+    _rematching = true;
+    final previous = _viewModel;
+    _matchNumber += 1;
+    _viewModel = _createOwnedViewModel(null);
+    previous.dispose();
+    if (mounted) setState(() {});
+    await Future<void>.delayed(Duration.zero);
+    _rematching = false;
+  }
+
+  bool get viewModelActive =>
+      _viewModel.state.status == GameStatus.active &&
+      _viewModel.canSubmitMatchAction;
+}
+
+String _sideLabel(PlayerSide side) {
+  return side == PlayerSide.dark ? 'Dark' : 'Light';
 }
 
 class _WideGameLayout extends StatelessWidget {
   const _WideGameLayout({
     required this.viewModel,
     required this.constraints,
+    required this.onRestart,
+    required this.onRematch,
+    required this.onBackToSetup,
+    required this.onResign,
     super.key,
   });
 
   final GameBoardViewModel viewModel;
   final BoxConstraints constraints;
+  final VoidCallback onRestart;
+  final VoidCallback? onRematch;
+  final VoidCallback onBackToSetup;
+  final VoidCallback onResign;
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +333,13 @@ class _WideGameLayout extends StatelessWidget {
           SizedBox(
             width: 330,
             child: SingleChildScrollView(
-              child: _GameInformation(viewModel: viewModel),
+              child: _GameInformation(
+                viewModel: viewModel,
+                onRestart: onRestart,
+                onRematch: onRematch,
+                onBackToSetup: onBackToSetup,
+                onResign: onResign,
+              ),
             ),
           ),
         ],
@@ -175,11 +352,19 @@ class _PhoneGameLayout extends StatelessWidget {
   const _PhoneGameLayout({
     required this.viewModel,
     required this.maxWidth,
+    required this.onRestart,
+    required this.onRematch,
+    required this.onBackToSetup,
+    required this.onResign,
     super.key,
   });
 
   final GameBoardViewModel viewModel;
   final double maxWidth;
+  final VoidCallback onRestart;
+  final VoidCallback? onRematch;
+  final VoidCallback onBackToSetup;
+  final VoidCallback onResign;
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +392,14 @@ class _PhoneGameLayout extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-          child: _GameInformation(viewModel: viewModel, includeHeader: false),
+          child: _GameInformation(
+            viewModel: viewModel,
+            includeHeader: false,
+            onRestart: onRestart,
+            onRematch: onRematch,
+            onBackToSetup: onBackToSetup,
+            onResign: onResign,
+          ),
         ),
       ],
     );
@@ -215,9 +407,20 @@ class _PhoneGameLayout extends StatelessWidget {
 }
 
 class _GameInformation extends StatelessWidget {
-  const _GameInformation({required this.viewModel, this.includeHeader = true});
+  const _GameInformation({
+    required this.viewModel,
+    required this.onRestart,
+    required this.onRematch,
+    required this.onBackToSetup,
+    required this.onResign,
+    this.includeHeader = true,
+  });
 
   final GameBoardViewModel viewModel;
+  final VoidCallback onRestart;
+  final VoidCallback? onRematch;
+  final VoidCallback onBackToSetup;
+  final VoidCallback onResign;
   final bool includeHeader;
 
   @override
@@ -233,50 +436,14 @@ class _GameInformation extends StatelessWidget {
           const _GameHeader(),
           const SizedBox(height: 28),
         ],
-        Semantics(
-          container: true,
-          liveRegion: true,
-          label: '${viewModel.statusTitle}. ${viewModel.statusDetail}',
-          child: ExcludeSemantics(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary
-                      .withValues(alpha: 0.25),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      viewModel.statusTitle,
-                      key: const Key('game-status-title'),
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer,
-                          ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      viewModel.statusDetail,
-                      key: const Key('game-status-detail'),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        if (state.status == GameStatus.completed)
+          _GameOverCard(
+            viewModel: viewModel,
+            onRematch: onRematch,
+            onBackToSetup: onBackToSetup,
+          )
+        else
+          _StatusCard(viewModel: viewModel),
         if (viewModel.captureRequired &&
             state.status == GameStatus.active) ...<Widget>[
           const SizedBox(height: 12),
@@ -329,35 +496,305 @@ class _GameInformation extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _MatchSummary(configuration: viewModel.configuration),
-        const SizedBox(height: 18),
-        Text(
-          'How to play',
-          style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Select a ringed piece, then choose a marked landing. '
-          'Numbered markers guide every step of a multiple capture.',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-        const SizedBox(height: 20),
-        OutlinedButton.icon(
-          key: const Key('new-game-button'),
-          onPressed: viewModel.canReset ? viewModel.reset : null,
-          icon: const Icon(Icons.restart_alt_rounded),
-          label: const Text('New game'),
-        ),
-        if (Navigator.of(context).canPop()) ...<Widget>[
-          const SizedBox(height: 10),
-          TextButton.icon(
-            key: const Key('leave-match-button'),
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text('Back to match setup'),
+        if (state.status == GameStatus.active) ...<Widget>[
+          const SizedBox(height: 18),
+          _MatchActions(
+            viewModel: viewModel,
+            onRestart: onRestart,
+            onBackToSetup: onBackToSetup,
+            onResign: onResign,
           ),
         ],
       ],
+    );
+  }
+}
+
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({required this.viewModel});
+
+  final GameBoardViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: '${viewModel.statusTitle}. ${viewModel.statusDetail}',
+      child: ExcludeSemantics(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  viewModel.statusTitle,
+                  key: const Key('game-status-title'),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  viewModel.statusDetail,
+                  key: const Key('game-status-detail'),
+                  style: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(color: scheme.onPrimaryContainer),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GameOverCard extends StatelessWidget {
+  const _GameOverCard({
+    required this.viewModel,
+    required this.onRematch,
+    required this.onBackToSetup,
+  });
+
+  final GameBoardViewModel viewModel;
+  final VoidCallback? onRematch;
+  final VoidCallback onBackToSetup;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final configuration = viewModel.configuration;
+    final details = <String>[
+      viewModel.sideResultLabel,
+      viewModel.statusDetail,
+      '${viewModel.state.ply} plies played',
+      if (configuration.mode == GameMode.humanVsAi)
+        '${configuration.difficulty.preset.label} computer',
+    ];
+    return Semantics(
+      key: const Key('game-over-card'),
+      container: true,
+      liveRegion: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Icon(
+                viewModel.state.outcome?.type == GameOutcomeType.draw
+                    ? Icons.handshake_rounded
+                    : Icons.emoji_events_rounded,
+                color: scheme.primary,
+                size: 34,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                viewModel.matchResultLabel,
+                key: const Key('game-over-result'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final detail in details) ...<Widget>[
+                Text(
+                  detail,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onPrimaryContainer),
+                ),
+                const SizedBox(height: 4),
+              ],
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const Key('rematch-button'),
+                onPressed: onRematch,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                icon: const Icon(Icons.replay_rounded),
+                label: const Text('Rematch'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                key: const Key('game-over-setup-button'),
+                onPressed: onBackToSetup,
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Back to Setup'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchActions extends StatelessWidget {
+  const _MatchActions({
+    required this.viewModel,
+    required this.onRestart,
+    required this.onBackToSetup,
+    required this.onResign,
+  });
+
+  final GameBoardViewModel viewModel;
+  final VoidCallback onRestart;
+  final VoidCallback onBackToSetup;
+  final VoidCallback onResign;
+
+  @override
+  Widget build(BuildContext context) {
+    final offer = viewModel.pendingDrawOffer;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Match actions',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        if (offer != null)
+          _DrawOfferCard(viewModel: viewModel, offer: offer)
+        else
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('offer-draw-button'),
+                  onPressed: viewModel.canOfferDraw
+                      ? () => viewModel.offerDraw(
+                          viewModel.isAiGame
+                              ? viewModel.configuration.humanSide
+                              : viewModel.state.activeSide,
+                        )
+                      : null,
+                  icon: const Icon(Icons.handshake_outlined),
+                  label: const Text('Offer draw'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('resign-button'),
+                  onPressed: viewModel.canSubmitMatchAction ? onResign : null,
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('Resign'),
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          key: const Key('restart-match-button'),
+          onPressed: viewModel.canReset ? onRestart : null,
+          icon: const Icon(Icons.restart_alt_rounded),
+          label: const Text('Restart current match'),
+        ),
+        TextButton.icon(
+          key: const Key('leave-match-button'),
+          onPressed: onBackToSetup,
+          icon: const Icon(Icons.arrow_back_rounded),
+          label: const Text('Back to match setup'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DrawOfferCard extends StatelessWidget {
+  const _DrawOfferCard({required this.viewModel, required this.offer});
+
+  final GameBoardViewModel viewModel;
+  final DrawOffer offer;
+
+  @override
+  Widget build(BuildContext context) {
+    final responseSide = offer.side == PlayerSide.dark
+        ? PlayerSide.light
+        : PlayerSide.dark;
+    final canHumanRespond =
+        !viewModel.isAiGame ||
+        responseSide == viewModel.configuration.humanSide;
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      key: const Key('draw-offer-card'),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              '${_sideLabel(offer.side)} offered a draw',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: scheme.onTertiaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (!canHumanRespond)
+              Text(
+                'The computer is responding.',
+                style: TextStyle(color: scheme.onTertiaryContainer),
+              )
+            else
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const Key('decline-draw-button'),
+                      onPressed: viewModel.canSubmitMatchAction
+                          ? () => viewModel.respondToDraw(
+                              side: responseSide,
+                              accepted: false,
+                            )
+                          : null,
+                      child: const Text('Decline'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('accept-draw-button'),
+                      onPressed: viewModel.canSubmitMatchAction
+                          ? () => viewModel.respondToDraw(
+                              side: responseSide,
+                              accepted: true,
+                            )
+                          : null,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

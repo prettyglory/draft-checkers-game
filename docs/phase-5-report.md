@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - authoritative in-process session slice complete
+Status: In progress - authoritative session and complete local match lifecycle slices complete
 
 ## Outcome
 
@@ -57,6 +57,27 @@ The session suite covers:
 
 The Flutter suite adds ViewModel/session integration coverage and reruns all
 Phase 4 board regressions.
+
+## Match lifecycle slice
+
+- Exposed existing authoritative resignation, draw offer, draw response, and
+  new-game commands through `GameBoardViewModel`; no Flutter widget creates a
+  winner, draw, or legal transition.
+- Added confirmed resignation for either local side, confirmed active-match
+  restart and exit, pending draw accept/decline controls, and duplicate-action
+  gating while a command is in flight or a game is complete.
+- Added a terminal summary with winner/draw, reason, side/player result, AI
+  difficulty when applicable, ply count, Rematch, and Back to Setup actions.
+- Defined Restart as `StartNewGameCommand` on the current session, preserving
+  configuration and monotonic revision. Defined Rematch as disposal and fresh
+  creation of the session, ViewModel, and AI runner with the same configuration.
+- Cancelled or invalidated AI work for terminal commands, unresolved draw state,
+  restart, rematch, and route disposal. Search results must still match the
+  current generation, revision, side, draw state, and active game status.
+- Added phone/tablet light/dark game-over goldens plus ViewModel and widget tests
+  for resignation, draw decline/acceptance, completed-state input rejection,
+  stale AI results, rematch configuration, opening AI turns, confirmation flows,
+  duplicate rematch protection, accessibility, and setup return.
 
 ## Quality gate
 

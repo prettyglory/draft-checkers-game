@@ -150,7 +150,7 @@ void main() {
         setupApp(
           boardBuilder: (configuration) => GameBoardScreen(
             configuration: configuration,
-            aiTurnRunner: runner,
+            aiTurnRunnerFactory: () => runner,
           ),
         ),
       );
@@ -178,13 +178,18 @@ void main() {
         const Offset(0, -700),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('new-game-button')));
+      await tester.tap(find.byKey(const Key('restart-match-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('confirm-restart-button')));
       await tester.pumpAndSettle();
       expect(runner.requests, hasLength(2));
       expect(runner.cancellationCount, greaterThan(0));
       expect(find.text('You play Light · AI: Dark'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('leave-match-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Leave active match?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm-leave-button')));
       await tester.pumpAndSettle();
 
       expect(find.byType(MatchSetupScreen), findsOneWidget);

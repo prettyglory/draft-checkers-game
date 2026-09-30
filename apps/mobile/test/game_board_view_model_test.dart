@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
+import 'package:draft_game/features/game/application/ai_turn_runner.dart';
 import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,7 +38,7 @@ void main() {
 
   GameBoardViewModel createAiViewModel(
     InProcessGameSession session,
-    ControlledAiTurnRunner runner, {
+    AiTurnRunner runner, {
     PlayerSide humanSide = PlayerSide.dark,
     AiDifficulty difficulty = AiDifficulty.medium,
   }) {
@@ -214,7 +217,7 @@ void main() {
       expect(viewModel.state, same(session.currentState));
       expect(viewModel.state.status, GameStatus.completed);
       expect(viewModel.statusTitle, 'Dark wins');
-      expect(viewModel.statusDetail, 'The opposing player resigned.');
+      expect(viewModel.statusDetail, 'Light resigned.');
     },
   );
 
@@ -328,4 +331,199 @@ void main() {
     expect(runner.disposed, isTrue);
     expect(runner.hasPendingSearch, isFalse);
   });
+
+  test(
+    'either human side can resign and repeated resignation is ignored',
+    () async {
+      final viewModel = createViewModel(createSession());
+      addTearDown(viewModel.dispose);
+      await pumpEventQueue();
+
+      final receipt = await viewModel.resign(PlayerSide.light);
+      final revision = viewModel.state.revision;
+      final repeated = await viewModel.resign(PlayerSide.light);
+
+      expect(receipt?.accepted, isTrue);
+      expect(viewModel.state.status, GameStatus.completed);
+      expect(viewModel.state.outcome?.winner, PlayerSide.dark);
+      expect(viewModel.state.outcome?.reason, GameOutcomeReason.resignation);
+      expect(viewModel.matchResultLabel, 'Dark wins');
+      expect(viewModel.sideResultLabel, 'Dark won · Light lost');
+      expect(repeated, isNull);
+      expect(viewModel.state.revision, revision);
+    },
+  );
+
+  test('AI side can resign and records the human result', () async {
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(
+      createSession(),
+      runner,
+      humanSide: PlayerSide.light,
+    );
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+
+    await viewModel.resign(PlayerSide.dark);
+
+    expect(viewModel.state.outcome?.winner, PlayerSide.light);
+    expect(viewModel.matchResultLabel, 'You win');
+    expect(viewModel.sideResultLabel, 'Your Light side won.');
+    expect(runner.hasPendingSearch, isFalse);
+  });
+
+  test('draw offer can be declined and then accepted', () async {
+    final viewModel = createViewModel(createSession());
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+
+    final offered = await viewModel.offerDraw(PlayerSide.dark);
+    expect(offered?.accepted, isTrue);
+    expect(viewModel.pendingDrawOffer?.side, PlayerSide.dark);
+    expect(viewModel.canHumanInteract, isFalse);
+
+    final declined = await viewModel.respondToDraw(
+      side: PlayerSide.light,
+      accepted: false,
+    );
+    expect(declined?.accepted, isTrue);
+    expect(viewModel.pendingDrawOffer, isNull);
+    expect(viewModel.state.status, GameStatus.active);
+
+    await viewModel.offerDraw(PlayerSide.light);
+    final accepted = await viewModel.respondToDraw(
+      side: PlayerSide.dark,
+      accepted: true,
+    );
+    final repeated = await viewModel.respondToDraw(
+      side: PlayerSide.dark,
+      accepted: true,
+    );
+
+    expect(accepted?.accepted, isTrue);
+    expect(viewModel.state.status, GameStatus.completed);
+    expect(viewModel.state.outcome?.type, GameOutcomeType.draw);
+    expect(viewModel.state.outcome?.reason, GameOutcomeReason.drawAgreement);
+    expect(viewModel.matchResultLabel, 'Draw');
+    expect(repeated, isNull);
+  });
+
+  test(
+    'AI draw response is authoritative and cannot be controlled by human',
+    () async {
+      final runner = ControlledAiTurnRunner();
+      final viewModel = createAiViewModel(createSession(), runner);
+      addTearDown(viewModel.dispose);
+      await pumpEventQueue();
+
+      final offered = await viewModel.offerDraw(PlayerSide.dark);
+
+      expect(offered?.accepted, isTrue);
+      expect(viewModel.pendingDrawOffer, isNull);
+      expect(viewModel.state.status, GameStatus.active);
+      expect(
+        await viewModel.respondToDraw(side: PlayerSide.light, accepted: true),
+        isNull,
+      );
+    },
+  );
+
+  test('completed game ignores further board input', () async {
+    final viewModel = createViewModel(createSession());
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+    await viewModel.resign(PlayerSide.light);
+    final revision = viewModel.state.revision;
+
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 3, column: 0));
+
+    expect(viewModel.selectedPieceId, isNull);
+    expect(viewModel.state.revision, revision);
+    expect(viewModel.legalMoves, isEmpty);
+  });
+
+  test(
+    'completion cancels AI search and restart ignores its stale result',
+    () async {
+      final runner = _StubbornAiTurnRunner();
+      final viewModel = createAiViewModel(
+        createSession(),
+        runner,
+        humanSide: PlayerSide.light,
+      );
+      addTearDown(viewModel.dispose);
+      await pumpEventQueue();
+      expect(runner.requests, hasLength(1));
+
+      await viewModel.restart();
+      await pumpEventQueue();
+      expect(runner.cancellationCount, greaterThan(0));
+      expect(runner.requests, hasLength(2));
+      expect(viewModel.state.revision, 1);
+
+      runner.complete(0);
+      await pumpEventQueue();
+
+      expect(viewModel.state.revision, 1);
+      expect(viewModel.state.activeSide, PlayerSide.dark);
+      expect(viewModel.aiTurnStatus, AiTurnStatus.thinking);
+    },
+  );
+}
+
+final class _StubbornAiTurnRunner implements AiTurnRunner {
+  final List<AiTurnRequestRecord> requests = <AiTurnRequestRecord>[];
+  final List<Completer<AiSearchResult>> _completers =
+      <Completer<AiSearchResult>>[];
+  int cancellationCount = 0;
+
+  @override
+  Future<AiSearchResult> chooseMove({
+    required AiDifficulty difficulty,
+    required GameState state,
+    required List<Move> legalMoves,
+  }) {
+    requests.add(
+      AiTurnRequestRecord(
+        difficulty: difficulty,
+        state: state,
+        legalMoves: List<Move>.unmodifiable(legalMoves),
+      ),
+    );
+    final completer = Completer<AiSearchResult>();
+    _completers.add(completer);
+    return completer.future;
+  }
+
+  void complete(int index) {
+    final request = requests[index];
+    _completers[index].complete(
+      AiSearchResult(
+        move: request.legalMoves.first,
+        metadata: AiSearchMetadata(
+          strategyId: 'stubborn-test-ai',
+          nodesExamined: 1,
+          completedDepth: 1,
+          elapsed: Duration.zero,
+          stopReason: SearchStopReason.completed,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void cancel() {
+    cancellationCount += 1;
+  }
+
+  @override
+  void dispose() {
+    cancel();
+    for (final completer in _completers) {
+      if (!completer.isCompleted) {
+        completer.completeError(const AiSearchCancelledException());
+      }
+    }
+  }
 }

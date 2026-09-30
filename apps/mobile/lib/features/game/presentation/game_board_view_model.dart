@@ -23,7 +23,8 @@ final class GameBoardViewModel extends ChangeNotifier {
        _configuration = configuration ?? const GameConfiguration(),
        _aiTurnRunner = aiTurnRunner ?? IsolateAiTurnRunner(),
        _state = session.currentState,
-       _legalMoves = session.legalMoves {
+       _legalMoves = session.legalMoves,
+       _pendingDrawOffer = session.pendingDrawOffer {
     if (actorIdsBySide.length != PlayerSide.values.length ||
         actorIdsBySide.values.any((actorId) => actorId.trim().isEmpty)) {
       throw ArgumentError('A non-empty actor id is required for each side.');
@@ -41,6 +42,7 @@ final class GameBoardViewModel extends ChangeNotifier {
   late final Future<void> _startFuture;
   GameState _state;
   List<Move> _legalMoves;
+  DrawOffer? _pendingDrawOffer;
   CommandReceipt? _lastCommandReceipt;
   Object? _sessionError;
   Object? _aiError;
@@ -63,14 +65,22 @@ final class GameBoardViewModel extends ChangeNotifier {
   CommandReceipt? get lastCommandReceipt => _lastCommandReceipt;
   Object? get sessionError => _sessionError;
   Object? get aiError => _aiError;
+  DrawOffer? get pendingDrawOffer => _pendingDrawOffer;
   GameConfiguration get configuration => _configuration;
   AiTurnStatus get aiTurnStatus => _aiTurnStatus;
   bool get isAiThinking => _aiTurnStatus == AiTurnStatus.thinking;
   bool get isAiGame => _configuration.mode == GameMode.humanVsAi;
-  bool get canReset => !_submitting;
+  bool get canReset => !_submitting && _sessionError == null;
+  bool get canSubmitMatchAction =>
+      !_submitting &&
+      _sessionError == null &&
+      _state.status == GameStatus.active;
+  bool get canOfferDraw =>
+      canSubmitMatchAction && _pendingDrawOffer == null && !isAiThinking;
   bool get canHumanInteract =>
       !_submitting &&
       !isAiThinking &&
+      _pendingDrawOffer == null &&
       (_configuration.mode == GameMode.localTwoPlayer ||
           _state.activeSide == _configuration.humanSide);
 
@@ -159,7 +169,7 @@ final class GameBoardViewModel extends ChangeNotifier {
           );
         } finally {
           _submitting = false;
-          _synchronizeFromSession(clearSelection: true);
+          if (!_disposed) _synchronizeFromSession(clearSelection: true);
         }
       } else {
         _selectedPath = List<BoardPosition>.unmodifiable(nextPath);
@@ -185,26 +195,85 @@ final class GameBoardViewModel extends ChangeNotifier {
     _clearSelection();
   }
 
-  Future<void> reset() async {
+  Future<void> reset() => restart();
+
+  Future<void> restart() async {
     await _startFuture;
-    if (_sessionError != null) {
-      return;
+    await _submitMatchAction(
+      side: _state.activeSide,
+      cancelAi: true,
+      allowCompleted: true,
+      createCommand: (commandId, actorId, revision) => StartNewGameCommand(
+        commandId: commandId,
+        actorId: actorId,
+        expectedRevision: revision,
+      ),
+    );
+  }
+
+  Future<CommandReceipt?> resign(PlayerSide side) async {
+    await _startFuture;
+    return _submitMatchAction(
+      side: side,
+      cancelAi: true,
+      createCommand: (commandId, actorId, revision) => ResignCommand(
+        commandId: commandId,
+        actorId: actorId,
+        expectedRevision: revision,
+      ),
+    );
+  }
+
+  Future<CommandReceipt?> offerDraw(PlayerSide side) async {
+    await _startFuture;
+    if (_pendingDrawOffer != null || isAiThinking) return null;
+    final receipt = await _submitMatchAction(
+      side: side,
+      createCommand: (commandId, actorId, revision) => OfferDrawCommand(
+        commandId: commandId,
+        actorId: actorId,
+        expectedRevision: revision,
+      ),
+    );
+    if (receipt?.accepted ?? false) {
+      final aiSide = _configuration.aiSide;
+      if (aiSide != null && _pendingDrawOffer?.side != aiSide) {
+        await _respondToDraw(side: aiSide, accepted: false, allowAiActor: true);
+      }
     }
-    if (_submitting) return;
-    _cancelAiTurn(notify: true);
-    _submitting = true;
-    try {
-      _lastCommandReceipt = await _session.submit(
-        StartNewGameCommand(
-          commandId: _nextCommandId('new-game'),
-          actorId: _actorIdsBySide[_state.activeSide]!,
-          expectedRevision: _state.revision,
-        ),
-      );
-    } finally {
-      _submitting = false;
-      _synchronizeFromSession(clearSelection: true);
+    return receipt;
+  }
+
+  Future<CommandReceipt?> respondToDraw({
+    required PlayerSide side,
+    required bool accepted,
+  }) {
+    return _respondToDraw(side: side, accepted: accepted);
+  }
+
+  Future<CommandReceipt?> _respondToDraw({
+    required PlayerSide side,
+    required bool accepted,
+    bool allowAiActor = false,
+  }) async {
+    await _startFuture;
+    final offer = _pendingDrawOffer;
+    if (offer == null ||
+        offer.side == side ||
+        (isAiGame && side != _configuration.humanSide && !allowAiActor)) {
+      return null;
     }
+    return _submitMatchAction(
+      side: side,
+      cancelAi: accepted,
+      createCommand: (commandId, actorId, revision) => RespondToDrawCommand(
+        commandId: commandId,
+        actorId: actorId,
+        expectedRevision: revision,
+        offerCommandId: offer.commandId,
+        accepted: accepted,
+      ),
+    );
   }
 
   Future<void> setGameMode(GameMode mode) async {
@@ -254,7 +323,7 @@ final class GameBoardViewModel extends ChangeNotifier {
           'The same position occurred three times.',
         GameOutcomeReason.moveLimit =>
           'Forty moves per side passed without progress.',
-        GameOutcomeReason.resignation => 'The opposing player resigned.',
+        GameOutcomeReason.resignation => _resignationDetail,
         GameOutcomeReason.drawAgreement => 'Both players agreed to a draw.',
         _ => 'The game has ended.',
       };
@@ -286,6 +355,41 @@ final class GameBoardViewModel extends ChangeNotifier {
     AiTurnStatus.error => 'Error',
   };
 
+  String get _resignationDetail {
+    final winner = _state.outcome?.winner;
+    if (winner == null) return 'The match ended by resignation.';
+    final resignedSide = _opposite(winner);
+    if (!isAiGame) return '${_sideLabel(resignedSide)} resigned.';
+    return resignedSide == _configuration.humanSide
+        ? 'You resigned.'
+        : 'The computer resigned.';
+  }
+
+  String get matchResultLabel {
+    final outcome = _state.outcome;
+    if (outcome == null) return '';
+    if (outcome.type == GameOutcomeType.draw) return 'Draw';
+    final winner = outcome.winner!;
+    if (!isAiGame) return '${_sideLabel(winner)} wins';
+    return winner == _configuration.humanSide ? 'You win' : 'Computer wins';
+  }
+
+  String get sideResultLabel {
+    final outcome = _state.outcome;
+    if (outcome == null) return '';
+    if (outcome.type == GameOutcomeType.draw) {
+      return isAiGame ? 'You and the computer drew.' : 'Dark and Light drew.';
+    }
+    final winner = outcome.winner!;
+    if (!isAiGame) {
+      return '${_sideLabel(winner)} won · ${_sideLabel(_opposite(winner))} lost';
+    }
+    final humanWon = winner == _configuration.humanSide;
+    return humanWon
+        ? 'Your ${_sideLabel(winner)} side won.'
+        : 'Your ${_sideLabel(_configuration.humanSide)} side lost.';
+  }
+
   List<Move> get _candidateMoves {
     return legalMoves
         .where(
@@ -307,8 +411,10 @@ final class GameBoardViewModel extends ChangeNotifier {
   }
 
   void _handleSessionUpdate(SessionUpdate update) {
+    if (_disposed) return;
     if (update is MoveCommitted ||
         update is StateReplaced ||
+        update is DrawOffered ||
         update is DrawOfferResolved) {
       _synchronizeFromSession(clearSelection: true);
     }
@@ -328,12 +434,17 @@ final class GameBoardViewModel extends ChangeNotifier {
   }
 
   void _synchronizeFromSession({required bool clearSelection}) {
+    if (_disposed) return;
     final nextState = _session.currentState;
+    final nextDrawOffer = _session.pendingDrawOffer;
     final stateChanged = !identical(_state, nextState);
-    if (stateChanged &&
+    final drawOfferChanged = !identical(_pendingDrawOffer, nextDrawOffer);
+    if ((stateChanged || drawOfferChanged) &&
         isAiThinking &&
         !_submitting &&
-        nextState.revision != _activeAiRevision) {
+        (nextState.status == GameStatus.completed ||
+            nextState.revision != _activeAiRevision ||
+            nextDrawOffer != null)) {
       _cancelAiTurn(notify: false);
     }
     final selectionChanged =
@@ -341,10 +452,11 @@ final class GameBoardViewModel extends ChangeNotifier {
         (_selectedPieceId != null || _selectedPath.isNotEmpty);
     _state = nextState;
     _legalMoves = _session.legalMoves;
+    _pendingDrawOffer = nextDrawOffer;
     if (clearSelection) {
       _clearSelection(notify: false);
     }
-    if (stateChanged || selectionChanged) {
+    if (stateChanged || drawOfferChanged || selectionChanged) {
       notifyListeners();
     }
     _scheduleAiTurn();
@@ -372,6 +484,7 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (_disposed ||
         aiSide == null ||
         _state.status == GameStatus.completed ||
+        _pendingDrawOffer != null ||
         _state.activeSide != aiSide ||
         _submitting ||
         _aiTurnStatus == AiTurnStatus.error ||
@@ -444,6 +557,7 @@ final class GameBoardViewModel extends ChangeNotifier {
     return !_disposed &&
         generation == _aiGeneration &&
         _configuration.aiSide == searchedState.activeSide &&
+        _pendingDrawOffer == null &&
         _state.status == GameStatus.active &&
         _state.revision == searchedState.revision &&
         _state.activeSide == searchedState.activeSide;
@@ -457,6 +571,42 @@ final class GameBoardViewModel extends ChangeNotifier {
     _aiTurnStatus = AiTurnStatus.ready;
     _aiError = null;
     if (changed && notify && !_disposed) notifyListeners();
+  }
+
+  Future<CommandReceipt?> _submitMatchAction({
+    required PlayerSide side,
+    required GameCommand Function(
+      String commandId,
+      String actorId,
+      int revision,
+    )
+    createCommand,
+    bool cancelAi = false,
+    bool allowCompleted = false,
+  }) async {
+    if (_disposed ||
+        _sessionError != null ||
+        _submitting ||
+        (!allowCompleted && _state.status == GameStatus.completed)) {
+      return null;
+    }
+    if (cancelAi) _cancelAiTurn(notify: false);
+    _submitting = true;
+    notifyListeners();
+    try {
+      final commandId = _nextCommandId('match-action');
+      final receipt = await _session.submit(
+        createCommand(commandId, _actorIdsBySide[side]!, _state.revision),
+      );
+      _lastCommandReceipt = receipt;
+      return receipt;
+    } finally {
+      _submitting = false;
+      if (!_disposed) {
+        _synchronizeFromSession(clearSelection: true);
+        notifyListeners();
+      }
+    }
   }
 
   String _nextCommandId(String kind) {
@@ -495,6 +645,10 @@ final class GameBoardViewModel extends ChangeNotifier {
 
   static String _sideLabel(PlayerSide side) {
     return side == PlayerSide.dark ? 'Dark' : 'Light';
+  }
+
+  static PlayerSide _opposite(PlayerSide side) {
+    return side == PlayerSide.dark ? PlayerSide.light : PlayerSide.dark;
   }
 }
 

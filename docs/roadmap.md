@@ -10,7 +10,8 @@ aspiration-window iterative search with killer/history quiet-move ordering and
 Principal Variation Search plus conservative Late Move Reductions and
 endgame-aware evaluation. Five deterministic mobile presets, isolated execution,
 a typed pre-match setup flow, side selection, and authoritative AI turn
-integration are complete; device performance evidence remains. Deterministic
+integration are complete. Local resignation, draw, game-over, restart, and fresh
+rematch UX are also complete; device performance evidence remains. Deterministic
 search-work benchmarking is complete.
 
 | Phase | Deliverable | Exit evidence |
@@ -19,11 +20,11 @@ search-work benchmarking is complete.
 | 2. Core engine | Immutable board/state, move application, serialization, replay/hash | Domain unit tests and property invariants |
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
-| 5. Single player (in progress) | Authoritative local session and typed pre-match setup complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus Flutter setup/board regressions; end-to-end persistence evidence pending |
-| 6. AI levels (in progress) | Contracts, five deterministic presets, endgame-aware fixed/iterative alpha-beta, cancellation, isolated Flutter execution, setup-side selection, authoritative session integration, and visible AI state complete; device tuning remains | 101 AI tests, 45 Flutter tests, and eleven-position depth-5 benchmarks cover presets, setup/navigation, deterministic search, cancellation, turn ownership, UI integration, and search work; fuzzing and measured device performance pending |
+| 5. Single player (in progress) | Authoritative local session, typed setup, resignation/draw flow, game-over UX, restart, and fresh rematch complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus Flutter lifecycle/setup/board regressions and 12 goldens; end-to-end persistence evidence pending |
+| 6. AI levels (in progress) | Contracts, five deterministic presets, endgame-aware fixed/iterative alpha-beta, cancellation, isolated Flutter execution, setup-side selection, authoritative session integration, and lifecycle cancellation complete; device tuning remains | 101 AI tests, 62 Flutter tests, and eleven-position depth-5 benchmarks cover presets, setup/navigation, lifecycle, deterministic search, cancellation, stale-result protection, turn ownership, UI integration, and search work; fuzzing and measured device performance pending |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |
-| 9. Same-device | Two-player handoff/orientation, rematch | Full local match and restoration tests |
+| 9. Same-device | Two-player handoff/orientation and rematch presentation policy | Full handoff match and restoration tests |
 | 10. Local Wi-Fi | Room discovery/code fallback, host authority, reconnect | Two-device loss/rejoin and state-hash tests |
 | 11. Bluetooth | Capability-gated platform adapters and pairing UX | Supported-device matrix; denial/loss/reconnect tests |
 | 12. Backend | Serverpod, PostgreSQL, Redis, auth, migrations, observability | Integration suite and deployable staging environment |
