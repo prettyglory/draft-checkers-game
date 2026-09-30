@@ -1,12 +1,18 @@
 import 'dart:ui' show SemanticsAction;
 
+import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
 import 'package:draft_game/app/draft_game_app.dart';
 import 'package:draft_game/app/theme/app_theme.dart';
+import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/game_board_screen.dart';
+import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:game_session/game_session.dart';
+
+import 'support/controlled_ai_turn_runner.dart';
 
 void main() {
   Future<void> pumpAtSize(
@@ -45,7 +51,7 @@ void main() {
     expect(find.byKey(const Key('phone-game-layout')), findsOneWidget);
     expect(find.byKey(const Key('game-board')), findsOneWidget);
     expect(find.text('Draft Game'), findsOneWidget);
-    expect(find.text('Phase 4 · Playable board'), findsOneWidget);
+    expect(find.text('Phase 6 · Computer play'), findsOneWidget);
     expect(find.text('Dark to move'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
@@ -382,5 +388,50 @@ void main() {
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     semantics.dispose();
+  });
+
+  testWidgets('shows AI setup and thinking state while blocking board input', (
+    tester,
+  ) async {
+    const engine = AmericanCheckersRulesEngine();
+    final runner = ControlledAiTurnRunner();
+    final session = InProcessGameSession(
+      id: 'ai-widget-test',
+      rulesEngine: engine,
+      initialState: engine.createInitialState(),
+      actorSides: const <String, PlayerSide>{
+        'local-dark': PlayerSide.dark,
+        'local-light': PlayerSide.light,
+      },
+    );
+    final viewModel = GameBoardViewModel(
+      session: session,
+      actorIdsBySide: const <PlayerSide, String>{
+        PlayerSide.dark: 'local-dark',
+        PlayerSide.light: 'local-light',
+      },
+      configuration: const GameConfiguration(
+        mode: GameMode.humanVsAi,
+        humanSide: PlayerSide.light,
+        difficulty: AiDifficulty.expert,
+      ),
+      aiTurnRunner: runner,
+    );
+    addTearDown(viewModel.dispose);
+
+    await pumpAtSize(
+      tester,
+      const Size(430, 1000),
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: GameBoardScreen(viewModel: viewModel),
+      ),
+    );
+
+    expect(find.byKey(const Key('difficulty-selector')), findsOneWidget);
+    expect(find.text('Computer is thinking'), findsOneWidget);
+    expect(find.text('AI: Thinking'), findsOneWidget);
+    expect(viewModel.selectablePieceIds, isEmpty);
+    expect(runner.requests, hasLength(1));
   });
 }

@@ -1,17 +1,27 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
+import 'package:draft_game/features/game/application/ai_turn_runner.dart';
+import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:flutter/foundation.dart';
 import 'package:game_session/game_session.dart';
+
+enum AiTurnStatus { ready, thinking, moveCompleted, error }
 
 final class GameBoardViewModel extends ChangeNotifier {
   GameBoardViewModel({
     required GameSession session,
     required Map<PlayerSide, String> actorIdsBySide,
+    GameConfiguration? configuration,
+    AiTurnRunner? aiTurnRunner,
     this.closeSessionOnDispose = true,
+    this.closeAiTurnRunnerOnDispose = true,
   }) : _session = session,
        _actorIdsBySide = Map<PlayerSide, String>.unmodifiable(actorIdsBySide),
+       _configuration = configuration ?? const GameConfiguration(),
+       _aiTurnRunner = aiTurnRunner ?? IsolateAiTurnRunner(),
        _state = session.currentState,
        _legalMoves = session.legalMoves {
     if (actorIdsBySide.length != PlayerSide.values.length ||
@@ -24,13 +34,20 @@ final class GameBoardViewModel extends ChangeNotifier {
 
   final GameSession _session;
   final Map<PlayerSide, String> _actorIdsBySide;
+  final AiTurnRunner _aiTurnRunner;
   final bool closeSessionOnDispose;
+  final bool closeAiTurnRunnerOnDispose;
   late final StreamSubscription<SessionUpdate> _updateSubscription;
   late final Future<void> _startFuture;
   GameState _state;
   List<Move> _legalMoves;
   CommandReceipt? _lastCommandReceipt;
   Object? _sessionError;
+  Object? _aiError;
+  GameConfiguration _configuration;
+  AiTurnStatus _aiTurnStatus = AiTurnStatus.ready;
+  int? _activeAiRevision;
+  int _aiGeneration = 0;
   String? _selectedPieceId;
   List<BoardPosition> _selectedPath = const <BoardPosition>[];
   int _commandNumber = 0;
@@ -45,14 +62,28 @@ final class GameBoardViewModel extends ChangeNotifier {
   List<Move> get legalMoves => _legalMoves;
   CommandReceipt? get lastCommandReceipt => _lastCommandReceipt;
   Object? get sessionError => _sessionError;
+  Object? get aiError => _aiError;
+  GameConfiguration get configuration => _configuration;
+  AiTurnStatus get aiTurnStatus => _aiTurnStatus;
+  bool get isAiThinking => _aiTurnStatus == AiTurnStatus.thinking;
+  bool get isAiGame => _configuration.mode == GameMode.humanVsAi;
+  bool get canReset => !_submitting;
+  bool get canHumanInteract =>
+      !_submitting &&
+      !isAiThinking &&
+      (_configuration.mode == GameMode.localTwoPlayer ||
+          _state.activeSide == _configuration.humanSide);
 
   bool get captureRequired => legalMoves.any((move) => move.isCapture);
 
-  Set<String> get selectablePieceIds =>
-      Set<String>.unmodifiable(legalMoves.map((move) => move.pieceId));
+  Set<String> get selectablePieceIds => canHumanInteract
+      ? Set<String>.unmodifiable(legalMoves.map((move) => move.pieceId))
+      : const <String>{};
 
   Set<BoardPosition> get targetPositions {
-    if (_selectedPieceId == null || _selectedPath.isEmpty) {
+    if (!canHumanInteract ||
+        _selectedPieceId == null ||
+        _selectedPath.isEmpty) {
       return const <BoardPosition>{};
     }
     return Set<BoardPosition>.unmodifiable(
@@ -98,7 +129,7 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (_sessionError != null) {
       return;
     }
-    if (_state.status == GameStatus.completed || _submitting) {
+    if (_state.status == GameStatus.completed || !canHumanInteract) {
       return;
     }
 
@@ -159,9 +190,8 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (_sessionError != null) {
       return;
     }
-    if (_submitting) {
-      return;
-    }
+    if (_submitting) return;
+    _cancelAiTurn(notify: true);
     _submitting = true;
     try {
       _lastCommandReceipt = await _session.submit(
@@ -177,6 +207,20 @@ final class GameBoardViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> setGameMode(GameMode mode) async {
+    await _replaceConfiguration(_configuration.copyWith(mode: mode));
+  }
+
+  Future<void> setHumanSide(PlayerSide side) async {
+    await _replaceConfiguration(_configuration.copyWith(humanSide: side));
+  }
+
+  Future<void> setDifficulty(AiDifficulty difficulty) async {
+    await _replaceConfiguration(
+      _configuration.copyWith(difficulty: difficulty),
+    );
+  }
+
   String get statusTitle {
     final outcome = _state.outcome;
     if (outcome?.type == GameOutcomeType.draw) {
@@ -184,6 +228,18 @@ final class GameBoardViewModel extends ChangeNotifier {
     }
     if (outcome?.winner case final winner?) {
       return '${_sideLabel(winner)} wins';
+    }
+    if (isAiGame) {
+      if (_aiTurnStatus == AiTurnStatus.thinking) {
+        return 'Computer is thinking';
+      }
+      if (_aiTurnStatus == AiTurnStatus.error) {
+        return 'Computer move failed';
+      }
+      if (_state.activeSide == _configuration.humanSide) {
+        return 'Your turn';
+      }
+      return 'Computer ready';
     }
     return '${_sideLabel(_state.activeSide)} to move';
   }
@@ -203,6 +259,12 @@ final class GameBoardViewModel extends ChangeNotifier {
         _ => 'The game has ended.',
       };
     }
+    if (isAiGame && _aiTurnStatus == AiTurnStatus.thinking) {
+      return '${_configuration.difficulty.preset.label} is choosing a move.';
+    }
+    if (isAiGame && _aiTurnStatus == AiTurnStatus.error) {
+      return 'The computer could not complete its turn. Start a new game.';
+    }
     if (_selectedPieceId != null) {
       return isPathInProgress
           ? 'Continue the capture path.'
@@ -211,8 +273,18 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (captureRequired) {
       return 'A capture is required. Select a marked piece.';
     }
+    if (isAiGame && _aiTurnStatus == AiTurnStatus.moveCompleted) {
+      return 'Computer move completed. Select a marked piece.';
+    }
     return 'Select a marked piece to see its legal moves.';
   }
+
+  String get aiStateLabel => switch (_aiTurnStatus) {
+    AiTurnStatus.ready => 'Ready',
+    AiTurnStatus.thinking => 'Thinking',
+    AiTurnStatus.moveCompleted => 'Move completed',
+    AiTurnStatus.error => 'Error',
+  };
 
   List<Move> get _candidateMoves {
     return legalMoves
@@ -245,6 +317,8 @@ final class GameBoardViewModel extends ChangeNotifier {
   Future<void> _startSession() async {
     try {
       await _session.start();
+      _synchronizeFromSession(clearSelection: true);
+      _scheduleAiTurn();
     } catch (error) {
       _sessionError = error;
       if (!_disposed) {
@@ -256,6 +330,12 @@ final class GameBoardViewModel extends ChangeNotifier {
   void _synchronizeFromSession({required bool clearSelection}) {
     final nextState = _session.currentState;
     final stateChanged = !identical(_state, nextState);
+    if (stateChanged &&
+        isAiThinking &&
+        !_submitting &&
+        nextState.revision != _activeAiRevision) {
+      _cancelAiTurn(notify: false);
+    }
     final selectionChanged =
         clearSelection &&
         (_selectedPieceId != null || _selectedPath.isNotEmpty);
@@ -267,6 +347,116 @@ final class GameBoardViewModel extends ChangeNotifier {
     if (stateChanged || selectionChanged) {
       notifyListeners();
     }
+    _scheduleAiTurn();
+  }
+
+  Future<void> _replaceConfiguration(GameConfiguration next) async {
+    await _startFuture;
+    if (_disposed ||
+        _submitting ||
+        (next.mode == _configuration.mode &&
+            next.humanSide == _configuration.humanSide &&
+            next.difficulty == _configuration.difficulty)) {
+      return;
+    }
+    _cancelAiTurn(notify: false);
+    _configuration = next;
+    _aiError = null;
+    _aiTurnStatus = AiTurnStatus.ready;
+    notifyListeners();
+    await reset();
+  }
+
+  void _scheduleAiTurn() {
+    final aiSide = _configuration.aiSide;
+    if (_disposed ||
+        aiSide == null ||
+        _state.status == GameStatus.completed ||
+        _state.activeSide != aiSide ||
+        _submitting ||
+        _aiTurnStatus == AiTurnStatus.error ||
+        _activeAiRevision == _state.revision) {
+      return;
+    }
+    _activeAiRevision = _state.revision;
+    _aiGeneration += 1;
+    final generation = _aiGeneration;
+    final state = _state;
+    final legalMoves = List<Move>.unmodifiable(_legalMoves);
+    _aiError = null;
+    _aiTurnStatus = AiTurnStatus.thinking;
+    _clearSelection(notify: false);
+    notifyListeners();
+    unawaited(_runAiTurn(generation, state, legalMoves));
+  }
+
+  Future<void> _runAiTurn(
+    int generation,
+    GameState searchedState,
+    List<Move> searchedMoves,
+  ) async {
+    try {
+      final result = await _aiTurnRunner.chooseMove(
+        difficulty: _configuration.difficulty,
+        state: searchedState,
+        legalMoves: searchedMoves,
+      );
+      if (!_isCurrentAiTurn(generation, searchedState)) return;
+      final currentMove = _legalMoves
+          .where((move) => move.id == result.move.id)
+          .firstOrNull;
+      if (currentMove == null) {
+        throw StateError('AI returned a move that is no longer legal.');
+      }
+      _submitting = true;
+      final receipt = await _session.submit(
+        SubmitMoveCommand(
+          commandId: _nextCommandId('ai-move'),
+          actorId: _actorIdsBySide[searchedState.activeSide]!,
+          expectedRevision: searchedState.revision,
+          move: currentMove,
+        ),
+      );
+      if (!receipt.accepted) {
+        throw StateError('AI move was rejected: ${receipt.rejection}.');
+      }
+      _lastCommandReceipt = receipt;
+      if (generation == _aiGeneration && !_disposed) {
+        _aiTurnStatus = AiTurnStatus.moveCompleted;
+      }
+    } on AiSearchCancelledException {
+      return;
+    } catch (error) {
+      if (generation != _aiGeneration || _disposed) return;
+      _aiError = error;
+      _aiTurnStatus = AiTurnStatus.error;
+    } finally {
+      if (generation == _aiGeneration && !_disposed) {
+        _submitting = false;
+        _activeAiRevision = null;
+        _synchronizeFromSession(clearSelection: true);
+        notifyListeners();
+      }
+    }
+  }
+
+  bool _isCurrentAiTurn(int generation, GameState searchedState) {
+    return !_disposed &&
+        generation == _aiGeneration &&
+        _configuration.aiSide == searchedState.activeSide &&
+        _state.status == GameStatus.active &&
+        _state.revision == searchedState.revision &&
+        _state.activeSide == searchedState.activeSide;
+  }
+
+  void _cancelAiTurn({required bool notify}) {
+    _aiGeneration += 1;
+    _activeAiRevision = null;
+    _aiTurnRunner.cancel();
+    final changed = _aiTurnStatus != AiTurnStatus.ready || _aiError != null;
+    _aiTurnStatus = AiTurnStatus.ready;
+    _aiError = null;
+    if (changed && notify && !_disposed) notifyListeners();
   }
 
   String _nextCommandId(String kind) {
@@ -277,6 +467,10 @@ final class GameBoardViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _cancelAiTurn(notify: false);
+    if (closeAiTurnRunnerOnDispose) {
+      _aiTurnRunner.dispose();
+    }
     unawaited(_updateSubscription.cancel());
     if (closeSessionOnDispose) {
       unawaited(_session.close());
@@ -302,4 +496,8 @@ final class GameBoardViewModel extends ChangeNotifier {
   static String _sideLabel(PlayerSide side) {
     return side == PlayerSide.dark ? 'Dark' : 'Light';
   }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

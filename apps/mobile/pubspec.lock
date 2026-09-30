@@ -25,6 +25,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  checkers_ai:
+    dependency: "direct main"
+    description:
+      path: "../../packages/checkers_ai"
+      relative: true
+    source: path
+    version: "0.1.0"
   checkers_engine:
     dependency: "direct main"
     description:

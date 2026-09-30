@@ -175,6 +175,29 @@ move plus strategy ID, nodes examined, completed depth, elapsed duration, and a
 stop reason. Random strategies require an explicit seed so tests and profiles
 can reproduce their move sequence.
 
+Flutter widgets depend only on `GameBoardViewModel`; they never construct or
+invoke a search strategy. The ViewModel observes authoritative session state,
+starts an isolated AI turn only when the configured AI side is active, and
+submits the selected move back through `SubmitMoveCommand`. `GameSession` again
+validates actor ownership, expected revision, and legality before the board can
+change. The resulting flow is UI -> ViewModel -> GameSession/AI actor -> search
+-> engine, with `GameSession` remaining the state authority.
+
+Five immutable presets provide deterministic node/depth ceilings without
+hardware-dependent duration cutoffs:
+
+| Preset | Depth | Nodes | Search policy |
+| --- | ---: | ---: | --- |
+| Beginner | 1 | 1 | Seeded legal-move selection |
+| Easy | 2 | 500 | Iterative alpha-beta, tactical ordering, TT |
+| Medium | 3 | 2,500 | Adds quiescence, aspiration, PVS, and killer/history |
+| Hard | 4 | 10,000 | Full search stack with conservative LMR |
+| Expert | 5 | 25,000 | Full stack plus endgame-aware evaluation |
+
+Reset, mode/side/difficulty changes, and ViewModel disposal kill an active search
+isolate and invalidate its generation. A result is accepted only if revision,
+side, mode, and generation still match the authoritative session snapshot.
+
 Static evaluation is expressed as explicit material, uncrowned advancement,
 center-control, active-side mobility, and terminal terms. Every evaluation is
 from a requested player's perspective, and terminal wins/losses dominate the

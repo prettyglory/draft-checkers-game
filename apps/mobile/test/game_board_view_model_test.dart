@@ -1,7 +1,11 @@
+import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
+import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:game_session/game_session.dart';
+
+import 'support/controlled_ai_turn_runner.dart';
 
 void main() {
   const engine = AmericanCheckersRulesEngine();
@@ -26,6 +30,27 @@ void main() {
         PlayerSide.dark: 'local-dark',
         PlayerSide.light: 'local-light',
       },
+    );
+  }
+
+  GameBoardViewModel createAiViewModel(
+    InProcessGameSession session,
+    ControlledAiTurnRunner runner, {
+    PlayerSide humanSide = PlayerSide.dark,
+    AiDifficulty difficulty = AiDifficulty.medium,
+  }) {
+    return GameBoardViewModel(
+      session: session,
+      actorIdsBySide: const <PlayerSide, String>{
+        PlayerSide.dark: 'local-dark',
+        PlayerSide.light: 'local-light',
+      },
+      configuration: GameConfiguration(
+        mode: GameMode.humanVsAi,
+        humanSide: humanSide,
+        difficulty: difficulty,
+      ),
+      aiTurnRunner: runner,
     );
   }
 
@@ -192,4 +217,115 @@ void main() {
       expect(viewModel.statusDetail, 'The opposing player resigned.');
     },
   );
+
+  test('AI moves only on its turn through the authoritative session', () async {
+    final session = createSession();
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(session, runner);
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+
+    expect(runner.requests, isEmpty);
+    expect(viewModel.canHumanInteract, isTrue);
+
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 3, column: 0));
+
+    expect(viewModel.state.activeSide, PlayerSide.light);
+    expect(viewModel.aiTurnStatus, AiTurnStatus.thinking);
+    expect(runner.requests, hasLength(1));
+    expect(runner.requests.single.state.revision, 1);
+    expect(runner.requests.single.difficulty, AiDifficulty.medium);
+
+    await viewModel.tapSquare(runner.requests.single.legalMoves.first.origin);
+    expect(viewModel.selectedPieceId, isNull);
+    expect(viewModel.selectablePieceIds, isEmpty);
+
+    final selectedMove = runner.requests.single.legalMoves.first;
+    runner.completeWithMove(selectedMove);
+    await pumpEventQueue();
+
+    expect(viewModel.state, same(session.currentState));
+    expect(viewModel.state.revision, 2);
+    expect(viewModel.state.activeSide, PlayerSide.dark);
+    expect(viewModel.lastCommandReceipt?.accepted, isTrue);
+    expect(viewModel.aiTurnStatus, AiTurnStatus.moveCompleted);
+    expect(viewModel.canHumanInteract, isTrue);
+  });
+
+  test('AI opens when the human chooses Light', () async {
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(
+      createSession(),
+      runner,
+      humanSide: PlayerSide.light,
+      difficulty: AiDifficulty.easy,
+    );
+    addTearDown(viewModel.dispose);
+
+    await pumpEventQueue();
+
+    expect(runner.requests, hasLength(1));
+    expect(runner.requests.single.state.activeSide, PlayerSide.dark);
+    expect(runner.requests.single.difficulty, AiDifficulty.easy);
+    expect(viewModel.canHumanInteract, isFalse);
+    expect(viewModel.statusTitle, 'Computer is thinking');
+  });
+
+  test('reset cancels a pending AI search and ignores its result', () async {
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(createSession(), runner);
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 3, column: 0));
+    expect(runner.hasPendingSearch, isTrue);
+    final cancellationsBefore = runner.cancellationCount;
+
+    await viewModel.reset();
+    await pumpEventQueue();
+
+    expect(runner.cancellationCount, greaterThan(cancellationsBefore));
+    expect(viewModel.state.revision, 2);
+    expect(viewModel.state.activeSide, PlayerSide.dark);
+    expect(viewModel.state.board.pieceCount, 24);
+    expect(viewModel.aiTurnStatus, AiTurnStatus.ready);
+    expect(runner.requests, hasLength(1));
+  });
+
+  test('difficulty change cancels search and starts a fresh match', () async {
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(createSession(), runner);
+    addTearDown(viewModel.dispose);
+    await pumpEventQueue();
+    await viewModel.tapSquare(BoardPosition(row: 2, column: 1));
+    await viewModel.tapSquare(BoardPosition(row: 3, column: 0));
+    final cancellationsBefore = runner.cancellationCount;
+
+    await viewModel.setDifficulty(AiDifficulty.expert);
+    await pumpEventQueue();
+
+    expect(viewModel.configuration.difficulty, AiDifficulty.expert);
+    expect(runner.cancellationCount, greaterThan(cancellationsBefore));
+    expect(viewModel.state.revision, 2);
+    expect(viewModel.state.activeSide, PlayerSide.dark);
+    expect(viewModel.aiTurnStatus, AiTurnStatus.ready);
+  });
+
+  test('disposing the view model cancels pending AI work', () async {
+    final runner = ControlledAiTurnRunner();
+    final viewModel = createAiViewModel(
+      createSession(),
+      runner,
+      humanSide: PlayerSide.light,
+    );
+    await pumpEventQueue();
+    expect(runner.hasPendingSearch, isTrue);
+
+    viewModel.dispose();
+    await pumpEventQueue();
+
+    expect(runner.disposed, isTrue);
+    expect(runner.hasPendingSearch, isFalse);
+  });
 }

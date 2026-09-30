@@ -28,8 +28,14 @@ promising improvements. Conservative one-ply Late Move Reductions shorten only
 safe non-PV quiet branches and verify any promising result at full depth. An
 optional endgame evaluator activates at six or fewer pieces and adds explicit
 king activity/centralization, promotion, mobility, trapping, edge safety,
-conversion, and draw-risk terms without changing middlegame scores. Ten
-difficulty profiles, isolate execution, and device performance evidence remain.
+conversion, and draw-risk terms without changing middlegame scores.
+
+The Flutter board now supports local two-player and human-versus-computer games
+with side selection and five deterministic presets: Beginner, Easy, Medium,
+Hard, and Expert. AI search runs in a killable isolate, user input is disabled
+on the computer turn, and the selected move is submitted through the same
+authoritative `GameSession` command path as human play. Device profiling and
+possible profile expansion remain.
 
 Deterministic search-work benchmarks can be run separately with
 `dart run benchmark/search_benchmark.dart --depth=5` from `packages/checkers_ai`.

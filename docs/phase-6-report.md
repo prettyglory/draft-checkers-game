@@ -251,9 +251,39 @@ legal-move fuzzing, and a measured device performance budget.
   more central `43-34`. Other compared moves remained stable. Across all eleven
   fixtures, current-full work changed from 7,409 to 7,398 nodes.
 
+## Slice 14: Flutter difficulty and AI turn integration
+
+- Added typed Beginner, Easy, Medium, Hard, and Expert presets to the pure-Dart
+  AI package. Each preset declares its strategy kind, depth/node ceilings,
+  transposition capacity, quiescence depth, search features, seed, and evaluator
+  mode.
+- Used deterministic depth/node budgets only: Beginner 1/1, Easy 2/500, Medium
+  3/2,500, Hard 4/10,000, and Expert 5/25,000. Duration limits remain excluded
+  until device measurements can establish defensible hardware-specific values.
+- Kept seeded legal selection for Beginner; used limited iterative search for
+  Easy; enabled quiescence, aspiration, PVS, and killer/history at Medium; enabled
+  the full stack including conservative LMR at Hard; and added endgame-aware
+  evaluation at Expert.
+- Added a Flutter game configuration model for local two-player or human-vs-AI,
+  human side, and selected difficulty. Local two-player remains the default.
+- Added a killable isolate runner that constructs the selected strategy outside
+  the UI isolate. Reset, mode/side/difficulty changes, disposal, and stale
+  authoritative updates cancel or invalidate pending work.
+- Extended `GameBoardViewModel` to launch one AI search per matching session
+  revision, block human interaction on AI turns, reject stale results, and submit
+  the selected move through the AI side's authoritative `SubmitMoveCommand`.
+- Added ready, thinking, move-completed, and error presentation states plus
+  responsive setup controls for mode, side, and difficulty.
+- Preserved existing two-player selection, multiple capture, promotion, king,
+  keyboard, semantics, phone/tablet, and light/dark behavior. Updated four visual
+  baselines for the intentional Phase 6 setup controls.
+- Added AI package tests for exact preset mapping and deterministic behavior, and
+  Flutter tests for isolated execution/cancellation, turn ownership, legal
+  authoritative moves, reset cancellation, difficulty changes, side choice,
+  blocked input, disposal, and visible thinking state.
+
 ## Remaining work
 
-- Ten documented difficulty profiles.
-- Isolate worker and AI session actor integration.
-- Flutter mode/level selection and thinking state.
 - Legal-move fuzzing and measured low-end-device performance evidence.
+- Device-informed budget tuning and possible expansion beyond the initial five
+  presets.

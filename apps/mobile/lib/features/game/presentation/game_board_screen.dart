@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:checkers_ai/checkers_ai.dart';
 import 'package:checkers_engine/checkers_engine.dart';
+import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/checkers_board.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +11,10 @@ import 'package:game_session/game_session.dart';
 const _darkActorId = 'local-dark';
 const _lightActorId = 'local-light';
 
-GameBoardViewModel _createLocalViewModel(GameState? initialState) {
+GameBoardViewModel _createLocalViewModel(
+  GameState? initialState,
+  GameConfiguration configuration,
+) {
   const engine = AmericanCheckersRulesEngine();
   final session = InProcessGameSession(
     id: 'local-game',
@@ -26,15 +31,21 @@ GameBoardViewModel _createLocalViewModel(GameState? initialState) {
       PlayerSide.dark: _darkActorId,
       PlayerSide.light: _lightActorId,
     },
+    configuration: configuration,
   );
 }
 
 class GameBoardScreen extends StatefulWidget {
-  const GameBoardScreen({this.initialState, this.viewModel, super.key})
-    : assert(initialState == null || viewModel == null);
+  const GameBoardScreen({
+    this.initialState,
+    this.viewModel,
+    this.configuration = const GameConfiguration(),
+    super.key,
+  }) : assert(initialState == null || viewModel == null);
 
   final GameState? initialState;
   final GameBoardViewModel? viewModel;
+  final GameConfiguration configuration;
 
   @override
   State<GameBoardScreen> createState() => _GameBoardScreenState();
@@ -48,7 +59,9 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   void initState() {
     super.initState();
     _ownsViewModel = widget.viewModel == null;
-    _viewModel = widget.viewModel ?? _createLocalViewModel(widget.initialState);
+    _viewModel =
+        widget.viewModel ??
+        _createLocalViewModel(widget.initialState, widget.configuration);
   }
 
   @override
@@ -305,6 +318,8 @@ class _GameInformation extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
+        _GameSetupControls(viewModel: viewModel),
+        const SizedBox(height: 18),
         Text(
           'How to play',
           style: Theme.of(context).textTheme.titleMedium
@@ -319,11 +334,136 @@ class _GameInformation extends StatelessWidget {
         const SizedBox(height: 20),
         OutlinedButton.icon(
           key: const Key('new-game-button'),
-          onPressed: viewModel.reset,
+          onPressed: viewModel.canReset ? viewModel.reset : null,
           icon: const Icon(Icons.restart_alt_rounded),
           label: const Text('New game'),
         ),
       ],
+    );
+  }
+}
+
+class _GameSetupControls extends StatelessWidget {
+  const _GameSetupControls({required this.viewModel});
+
+  final GameBoardViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final configuration = viewModel.configuration;
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'Game setup',
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            SegmentedButton<GameMode>(
+              key: const Key('game-mode-selector'),
+              segments: const <ButtonSegment<GameMode>>[
+                ButtonSegment<GameMode>(
+                  value: GameMode.localTwoPlayer,
+                  label: Text('Two players'),
+                  icon: Icon(Icons.people_alt_rounded),
+                ),
+                ButtonSegment<GameMode>(
+                  value: GameMode.humanVsAi,
+                  label: Text('Computer'),
+                  icon: Icon(Icons.memory_rounded),
+                ),
+              ],
+              selected: <GameMode>{configuration.mode},
+              onSelectionChanged: viewModel.canReset
+                  ? (selection) {
+                      viewModel.setGameMode(selection.single);
+                    }
+                  : null,
+            ),
+            if (configuration.mode == GameMode.humanVsAi) ...<Widget>[
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: DropdownButtonFormField<PlayerSide>(
+                      key: const Key('human-side-selector'),
+                      initialValue: configuration.humanSide,
+                      decoration: const InputDecoration(labelText: 'Your side'),
+                      items: const <DropdownMenuItem<PlayerSide>>[
+                        DropdownMenuItem<PlayerSide>(
+                          value: PlayerSide.dark,
+                          child: Text('Dark'),
+                        ),
+                        DropdownMenuItem<PlayerSide>(
+                          value: PlayerSide.light,
+                          child: Text('Light'),
+                        ),
+                      ],
+                      onChanged: viewModel.canReset
+                          ? (side) {
+                              if (side != null) viewModel.setHumanSide(side);
+                            }
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<AiDifficulty>(
+                      key: const Key('difficulty-selector'),
+                      initialValue: configuration.difficulty,
+                      decoration: const InputDecoration(
+                        labelText: 'Difficulty',
+                      ),
+                      items: AiDifficulty.values
+                          .map(
+                            (difficulty) => DropdownMenuItem<AiDifficulty>(
+                              value: difficulty,
+                              child: Text(difficulty.preset.label),
+                            ),
+                          )
+                          .toList(growable: false),
+                      onChanged: viewModel.canReset
+                          ? (difficulty) {
+                              if (difficulty != null) {
+                                viewModel.setDifficulty(difficulty);
+                              }
+                            }
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  Icon(
+                    viewModel.isAiThinking
+                        ? Icons.hourglass_top_rounded
+                        : Icons.memory_rounded,
+                    size: 18,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'AI: ${viewModel.aiStateLabel}',
+                    key: const Key('ai-state-label'),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -357,7 +497,7 @@ class _GameHeader extends StatelessWidget {
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
-                    'Phase 4 · Playable board',
+                    'Phase 6 · Computer play',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -384,7 +524,7 @@ class _GameHeader extends StatelessWidget {
         ),
         const SizedBox(height: 5),
         Text(
-          'American Checkers · Local board',
+          'American Checkers · Local and computer play',
           style: Theme.of(context).textTheme.bodyLarge
               ?.copyWith(color: scheme.onSurfaceVariant),
         ),
