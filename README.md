@@ -13,8 +13,11 @@ actors and revisions, applies legal commands, deduplicates command IDs, emits
 ordered updates, and handles resignation and draw agreements. The completed
 Phase 4 board behavior remains covered on phone and tablet. The local match UI
 now exposes confirmed resignation, authoritative draw offer/response controls,
-confirmed restart, game-over results, rematch, and return to setup. Persistence,
-clocks, undo, and process resume remain for later Phase 5 slices.
+confirmed restart, game-over results, rematch, and return to setup. Typed player
+preferences now persist on-device for theme, sound, reduced motion, text size,
+AI defaults, preferred side, board orientation, and destructive-action
+confirmations. Active-match persistence, clocks, undo, and process resume remain
+for later Phase 5 slices.
 
 Phase 6 has started with a separate pure-Dart AI package. It now provides
 measurable search budgets and metadata, cancellation contracts, a seeded legal
@@ -44,6 +47,11 @@ Rematch creates a fresh session with the same configuration. Terminal commands,
 restart, rematch, and leaving the board cancel pending AI work, and generation
 checks reject stale search results. Device profiling and possible profile
 expansion remain.
+
+Settings are available from match setup and apply reactively without bypassing
+the existing UI -> ViewModel -> `GameSession` -> AI/Search -> Engine flow.
+Malformed stored preferences fall back safely by field, and resetting settings
+requires confirmation before restoring every default.
 
 Deterministic search-work benchmarks can be run separately with
 `dart run benchmark/search_benchmark.dart --depth=5` from `packages/checkers_ai`.

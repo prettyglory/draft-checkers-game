@@ -4,9 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 class CheckersBoard extends StatelessWidget {
-  const CheckersBoard({required this.viewModel, super.key});
+  const CheckersBoard({
+    required this.viewModel,
+    this.rotateBoard = false,
+    this.largerLabels = false,
+    super.key,
+  });
 
   final GameBoardViewModel viewModel;
+  final bool rotateBoard;
+  final bool largerLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +27,8 @@ class CheckersBoard extends StatelessWidget {
       container: true,
       label:
           'American checkers board. ${viewModel.statusTitle}. '
-          '${viewModel.statusDetail}',
+          '${viewModel.statusDetail}. '
+          '${rotateBoard ? 'Dark' : 'Light'} side at bottom.',
       child: RepaintBoundary(
         key: const Key('game-board'),
         child: DecoratedBox(
@@ -47,13 +55,18 @@ class CheckersBoard extends StatelessWidget {
               crossAxisCount: state.boardSize,
             ),
             itemBuilder: (context, index) {
-              final row = index ~/ state.boardSize;
-              final column = index % state.boardSize;
+              final logicalIndex = rotateBoard
+                  ? state.boardSize * state.boardSize - 1 - index
+                  : index;
+              final row = logicalIndex ~/ state.boardSize;
+              final column = logicalIndex % state.boardSize;
               final position = BoardPosition(row: row, column: column);
               return _BoardSquare(
                 position: position,
+                visualIndex: index,
                 viewModel: viewModel,
                 duration: duration,
+                largerLabels: largerLabels,
               );
             },
           ),
@@ -66,13 +79,17 @@ class CheckersBoard extends StatelessWidget {
 class _BoardSquare extends StatelessWidget {
   const _BoardSquare({
     required this.position,
+    required this.visualIndex,
     required this.viewModel,
     required this.duration,
+    required this.largerLabels,
   });
 
   final BoardPosition position;
+  final int visualIndex;
   final GameBoardViewModel viewModel;
   final Duration duration;
+  final bool largerLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -136,8 +153,8 @@ class _BoardSquare extends StatelessWidget {
               right: 3,
               child: Container(
                 key: Key('path-${position.row}-${position.column}-$pathStep'),
-                width: 19,
-                height: 19,
+                width: largerLabels ? 23 : 19,
+                height: largerLabels ? 23 : 19,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: scheme.tertiaryContainer,
@@ -148,7 +165,7 @@ class _BoardSquare extends StatelessWidget {
                   '$pathStep',
                   style: TextStyle(
                     color: scheme.onTertiaryContainer,
-                    fontSize: 11,
+                    fontSize: largerLabels ? 14 : 11,
                     fontWeight: FontWeight.w900,
                     height: 1,
                   ),
@@ -167,9 +184,7 @@ class _BoardSquare extends StatelessWidget {
       key: Key('square-${position.row}-${position.column}'),
       container: true,
       excludeSemantics: true,
-      sortKey: OrdinalSortKey(
-        (position.row * viewModel.state.boardSize + position.column).toDouble(),
-      ),
+      sortKey: OrdinalSortKey(visualIndex.toDouble()),
       label: _semanticLabel(
         piece: piece,
         selectable: selectable,

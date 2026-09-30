@@ -11,8 +11,10 @@ Principal Variation Search plus conservative Late Move Reductions and
 endgame-aware evaluation. Five deterministic mobile presets, isolated execution,
 a typed pre-match setup flow, side selection, and authoritative AI turn
 integration are complete. Local resignation, draw, game-over, restart, and fresh
-rematch UX are also complete; device performance evidence remains. Deterministic
-search-work benchmarking is complete.
+rematch UX are also complete. Persistent typed player preferences, reactive
+theme/accessibility behavior, setup defaults, board orientation, and configurable
+confirmations are complete; active-match persistence and device performance
+evidence remain. Deterministic search-work benchmarking is complete.
 
 | Phase | Deliverable | Exit evidence |
 | --- | --- | --- |
@@ -20,8 +22,8 @@ search-work benchmarking is complete.
 | 2. Core engine | Immutable board/state, move application, serialization, replay/hash | Domain unit tests and property invariants |
 | 3. American rules | Complete WCDF movement/capture/promotion/win/draw behavior | Federation-derived position corpus passes |
 | 4. Board UI (complete) | Responsive accessible board, selection, move/capture highlights, motion primitives | 20 Flutter tests covering phone/tablet layouts, light/dark goldens, semantics, promotion, kings, capture branches, and keyboard play |
-| 5. Single player (in progress) | Authoritative local session, typed setup, resignation/draw flow, game-over UX, restart, and fresh rematch complete; persistence, clocks, undo policy, and resume remain | 18 session tests plus Flutter lifecycle/setup/board regressions and 12 goldens; end-to-end persistence evidence pending |
-| 6. AI levels (in progress) | Contracts, five deterministic presets, endgame-aware fixed/iterative alpha-beta, cancellation, isolated Flutter execution, setup-side selection, authoritative session integration, and lifecycle cancellation complete; device tuning remains | 101 AI tests, 62 Flutter tests, and eleven-position depth-5 benchmarks cover presets, setup/navigation, lifecycle, deterministic search, cancellation, stale-result protection, turn ownership, UI integration, and search work; fuzzing and measured device performance pending |
+| 5. Single player (in progress) | Authoritative local session, typed setup, complete local lifecycle, and persistent player preferences complete; active-match persistence, clocks, undo policy, and resume remain | 18 session tests and 83 Flutter tests, including 16 goldens, cover session, lifecycle, setup, settings persistence, responsive accessibility, and board regressions; active-match persistence evidence pending |
+| 6. AI levels (in progress) | Contracts, five deterministic presets, endgame-aware fixed/iterative alpha-beta, cancellation, isolated Flutter execution, setup-side selection, authoritative session integration, and lifecycle cancellation complete; device tuning remains | 101 AI tests, 83 Flutter tests, and eleven-position depth-5 benchmarks cover presets, setup/navigation, lifecycle, deterministic search, cancellation, stale-result protection, turn ownership, UI integration, and search work; fuzzing and measured device performance pending |
 | 7. Regional rules | International, Brazilian, Russian, Turkish | Separate conformance corpus for every ruleset |
 | 8. Story mode | Ten chapters, challenge evaluator, rewards, local progress | Objective/reward/unlock and migration tests |
 | 9. Same-device | Two-player handoff/orientation and rematch presentation policy | Full handoff match and restoration tests |
@@ -32,7 +34,7 @@ search-work benchmarking is complete.
 | 14. Profiles | Accounts, statistics, avatars, country, secure sessions | Privacy/auth/account lifecycle tests |
 | 15. Rankings | Transactional Elo, divisions, seasonal leaderboards | Deterministic rating tests and anti-abuse review |
 | 16. Achievements | Server/offline evaluators, sync, locked/unlocked UI | Idempotency and tamper-boundary tests |
-| 17. Polish | Themes, sound, haptics, animations, reduced motion | Accessibility, audio-focus, and frame-time review |
+| 17. Polish | Expand the implemented themes, sound gating, and reduced-motion settings with haptics and final animation/audio polish | Accessibility, audio-focus, and frame-time review |
 | 18. Hardening | Coverage gaps, profiling, reliability, security testing | Release-candidate quality gates pass |
 | 19. Release | Store metadata, signing, privacy disclosures, staged rollout | Android/iOS release candidates and rollback plan |
 

@@ -48,6 +48,18 @@ lib/
 - Services adapt SQLite, secure storage, platform APIs, audio, haptics, and the
   generated backend client.
 
+Player preferences follow a separate UI -> `SettingsController` ->
+`SettingsRepository` boundary because they configure presentation and match
+setup rather than authoritative game state. `SharedPreferences` is confined to
+the repository adapter; widgets consume immutable `PlayerSettings` and send
+typed updates through the controller. The app composition root loads settings
+before showing setup and reactively applies theme, reduced motion, and text
+scaling. Difficulty, preferred side, board orientation, confirmation policy,
+and sound gating are passed into their existing presentation boundaries without
+changing `GameSession` ownership of legal match transitions. Invalid persisted
+fields fall back independently to defaults. This preference store does not
+persist active matches or session metadata.
+
 ## Game engine structure
 
 `checkers_engine` is a deterministic state transition library:

@@ -2,7 +2,7 @@
 
 Started: 2026-09-28
 
-Status: In progress - authoritative session and complete local match lifecycle slices complete
+Status: In progress - authoritative session, local lifecycle, and player settings slices complete
 
 ## Outcome
 
@@ -10,8 +10,9 @@ The first Phase 5 slice places an authoritative local `GameSession` between the
 Flutter board view-model and deterministic rules engine. The view-model no
 longer imports, constructs, or calls `AmericanCheckersRulesEngine` directly.
 
-This slice establishes the single-player game-flow boundary but does not yet add
-persistence, clocks, undo, process resume, AI, networking, or backend services.
+This slice establishes the single-player game-flow boundary. Player preferences
+now persist separately, while active-match persistence, clocks, undo, process
+resume, networking, and backend services remain outside the completed work.
 
 ## Session behavior
 
@@ -88,11 +89,33 @@ All requested checks passed on Flutter 3.47.5 / Dart 3.13.4:
 | Engine unit tests | 41 passed |
 | Session unit tests | 18 passed |
 | Flutter static analysis | No issues |
-| Flutter tests | 21 passed, including 4 golden tests |
+| AI unit tests | 101 passed |
+| Flutter tests | 83 passed, including 16 golden tests |
+
+## Persistent player settings slice
+
+- Added immutable typed preferences for system/light/dark theme, sound effects,
+  reduced motion, larger text and board labels, default AI difficulty, preferred
+  human side, board orientation, and resign/restart confirmations.
+- Isolated `shared_preferences` behind `SettingsRepository`, with safe defaults
+  for missing, malformed, incorrectly typed, or unknown stored values.
+- Added a reactive `SettingsController` that serializes writes, exposes
+  persistence failures, gates sound output, and supports confirmed reset to all
+  defaults.
+- Added responsive phone/tablet Settings layouts. Theme, animation policy, and
+  text scaling update immediately; setup defaults and match preferences flow
+  through existing presentation boundaries.
+- Preserved `GameSession` as match authority. Orientation changes only visual
+  coordinate mapping and semantics, while confirmation preferences only control
+  whether existing authoritative restart/resign commands require a dialog.
+- Added model, repository, controller, widget, accessibility, integration, and
+  phone/tablet light/dark golden coverage. The full Flutter suite now contains
+  83 tests and 16 visual baselines.
 
 ## Remaining Phase 5 work
 
-- Persist active game snapshots and command/session metadata.
+- Persist active game snapshots and command/session metadata; player preferences
+  are already persisted independently.
 - Restore an interrupted game after process restart.
 - Define and implement clock and backgrounding policy.
 - Define undo policy and authoritative undo commands.

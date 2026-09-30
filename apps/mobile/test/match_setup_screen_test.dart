@@ -6,10 +6,12 @@ import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/application/match_setup_view_model.dart';
 import 'package:draft_game/features/game/presentation/game_board_screen.dart';
 import 'package:draft_game/features/game/presentation/match_setup_screen.dart';
+import 'package:draft_game/features/settings/application/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/controlled_ai_turn_runner.dart';
+import 'support/memory_settings_repository.dart';
 
 void main() {
   Future<void> pumpAtSize(
@@ -38,8 +40,17 @@ void main() {
     );
   }
 
+  Future<DraftGameApp> draftGameApp() async {
+    final controller = SettingsController(
+      settingsRepository: MemorySettingsRepository(),
+    );
+    addTearDown(controller.dispose);
+    await controller.initialize();
+    return DraftGameApp(settingsController: controller);
+  }
+
   testWidgets('app opens on valid Human vs Human setup', (tester) async {
-    await pumpAtSize(tester, const DraftGameApp());
+    await pumpAtSize(tester, await draftGameApp());
 
     expect(find.byType(MatchSetupScreen), findsOneWidget);
     expect(find.byKey(const Key('phone-setup-layout')), findsOneWidget);
@@ -103,7 +114,7 @@ void main() {
   ) async {
     await pumpAtSize(
       tester,
-      const DraftGameApp(),
+      await draftGameApp(),
       size: const Size(320, 700),
       textScaleFactor: 2,
     );
@@ -200,7 +211,7 @@ void main() {
 
   testWidgets('setup meets accessibility guidelines', (tester) async {
     final semantics = tester.ensureSemantics();
-    await pumpAtSize(tester, const DraftGameApp());
+    await pumpAtSize(tester, await draftGameApp());
 
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));

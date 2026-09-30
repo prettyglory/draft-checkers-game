@@ -7,6 +7,7 @@ import 'package:draft_game/features/game/application/ai_turn_runner.dart';
 import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/presentation/checkers_board.dart';
 import 'package:draft_game/features/game/presentation/game_board_view_model.dart';
+import 'package:draft_game/features/settings/domain/player_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:game_session/game_session.dart';
 
@@ -47,6 +48,7 @@ class GameBoardScreen extends StatefulWidget {
     this.initialState,
     this.viewModel,
     this.configuration = const GameConfiguration(),
+    this.preferences = PlayerSettings.defaults,
     this.aiTurnRunnerFactory,
     super.key,
   }) : assert(initialState == null || viewModel == null),
@@ -55,6 +57,7 @@ class GameBoardScreen extends StatefulWidget {
   final GameState? initialState;
   final GameBoardViewModel? viewModel;
   final GameConfiguration configuration;
+  final PlayerSettings preferences;
   final AiTurnRunnerFactory? aiTurnRunnerFactory;
 
   @override
@@ -121,6 +124,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                             onRematch: _ownsViewModel ? _rematch : null,
                             onBackToSetup: _confirmBackToSetup,
                             onResign: _confirmResignation,
+                            rotateBoard: _rotateBoard,
+                            largerLabels: widget.preferences.largerText,
                           )
                         : _PhoneGameLayout(
                             key: const Key('phone-game-layout'),
@@ -130,6 +135,8 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
                             onRematch: _ownsViewModel ? _rematch : null,
                             onBackToSetup: _confirmBackToSetup,
                             onResign: _confirmResignation,
+                            rotateBoard: _rotateBoard,
+                            largerLabels: widget.preferences.largerText,
                           );
                   },
                 );
@@ -152,6 +159,10 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   Future<void> _confirmRestart() async {
     if (_dialogOpen || !mounted) return;
+    if (!widget.preferences.confirmBeforeRestart) {
+      await _viewModel.restart();
+      return;
+    }
     _dialogOpen = true;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -179,6 +190,13 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
 
   Future<void> _confirmResignation() async {
     if (_dialogOpen || !mounted || !viewModelActive) return;
+    if (!widget.preferences.confirmBeforeResign) {
+      final side = _viewModel.isAiGame
+          ? _viewModel.configuration.humanSide
+          : _viewModel.state.activeSide;
+      await _viewModel.resign(side);
+      return;
+    }
     _dialogOpen = true;
     final side = await showDialog<PlayerSide>(
       context: context,
@@ -283,6 +301,16 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
   bool get viewModelActive =>
       _viewModel.state.status == GameStatus.active &&
       _viewModel.canSubmitMatchAction;
+
+  bool get _rotateBoard {
+    return switch (widget.preferences.boardOrientation) {
+      BoardOrientationPreference.automatic =>
+        _viewModel.isAiGame &&
+            _viewModel.configuration.humanSide == PlayerSide.dark,
+      BoardOrientationPreference.darkAtBottom => true,
+      BoardOrientationPreference.lightAtBottom => false,
+    };
+  }
 }
 
 String _sideLabel(PlayerSide side) {
@@ -297,6 +325,8 @@ class _WideGameLayout extends StatelessWidget {
     required this.onRematch,
     required this.onBackToSetup,
     required this.onResign,
+    required this.rotateBoard,
+    required this.largerLabels,
     super.key,
   });
 
@@ -306,6 +336,8 @@ class _WideGameLayout extends StatelessWidget {
   final VoidCallback? onRematch;
   final VoidCallback onBackToSetup;
   final VoidCallback onResign;
+  final bool rotateBoard;
+  final bool largerLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +357,11 @@ class _WideGameLayout extends StatelessWidget {
             child: Center(
               child: SizedBox.square(
                 dimension: boardDimension,
-                child: CheckersBoard(viewModel: viewModel),
+                child: CheckersBoard(
+                  viewModel: viewModel,
+                  rotateBoard: rotateBoard,
+                  largerLabels: largerLabels,
+                ),
               ),
             ),
           ),
@@ -356,6 +392,8 @@ class _PhoneGameLayout extends StatelessWidget {
     required this.onRematch,
     required this.onBackToSetup,
     required this.onResign,
+    required this.rotateBoard,
+    required this.largerLabels,
     super.key,
   });
 
@@ -365,6 +403,8 @@ class _PhoneGameLayout extends StatelessWidget {
   final VoidCallback? onRematch;
   final VoidCallback onBackToSetup;
   final VoidCallback onResign;
+  final bool rotateBoard;
+  final bool largerLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -385,7 +425,11 @@ class _PhoneGameLayout extends StatelessWidget {
             child: Center(
               child: SizedBox.square(
                 dimension: boardDimension,
-                child: CheckersBoard(viewModel: viewModel),
+                child: CheckersBoard(
+                  viewModel: viewModel,
+                  rotateBoard: rotateBoard,
+                  largerLabels: largerLabels,
+                ),
               ),
             ),
           ),

@@ -3,15 +3,26 @@ import 'package:checkers_engine/checkers_engine.dart';
 import 'package:draft_game/features/game/application/game_configuration.dart';
 import 'package:draft_game/features/game/application/match_setup_view_model.dart';
 import 'package:draft_game/features/game/presentation/game_board_screen.dart';
+import 'package:draft_game/features/settings/application/settings_controller.dart';
+import 'package:draft_game/features/settings/domain/player_settings.dart';
+import 'package:draft_game/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 
 typedef MatchBoardBuilder = Widget Function(GameConfiguration configuration);
 
 class MatchSetupScreen extends StatefulWidget {
-  const MatchSetupScreen({this.viewModel, this.boardBuilder, super.key});
+  const MatchSetupScreen({
+    this.viewModel,
+    this.boardBuilder,
+    this.preferences = PlayerSettings.defaults,
+    this.settingsController,
+    super.key,
+  });
 
   final MatchSetupViewModel? viewModel;
   final MatchBoardBuilder? boardBuilder;
+  final PlayerSettings preferences;
+  final SettingsController? settingsController;
 
   @override
   State<MatchSetupScreen> createState() => _MatchSetupScreenState();
@@ -26,7 +37,27 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
   void initState() {
     super.initState();
     _ownsViewModel = widget.viewModel == null;
-    _viewModel = widget.viewModel ?? MatchSetupViewModel();
+    _viewModel =
+        widget.viewModel ??
+        MatchSetupViewModel(
+          initialHumanSide: widget.preferences.preferredHumanSide,
+          initialDifficulty: widget.preferences.defaultAiDifficulty,
+        );
+  }
+
+  @override
+  void didUpdateWidget(MatchSetupScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_ownsViewModel) {
+      if (oldWidget.preferences.preferredHumanSide !=
+          widget.preferences.preferredHumanSide) {
+        _viewModel.setHumanSide(widget.preferences.preferredHumanSide);
+      }
+      if (oldWidget.preferences.defaultAiDifficulty !=
+          widget.preferences.defaultAiDifficulty) {
+        _viewModel.setDifficulty(widget.preferences.defaultAiDifficulty);
+      }
+    }
   }
 
   @override
@@ -60,12 +91,14 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
                       viewModel: _viewModel,
                       starting: _starting,
                       onStartGame: _startGame,
+                      onOpenSettings: _openSettings,
                     );
                   }
                   return _PhoneSetupLayout(
                     viewModel: _viewModel,
                     starting: _starting,
                     onStartGame: _startGame,
+                    onOpenSettings: _openSettings,
                   );
                 },
               );
@@ -80,14 +113,29 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
     final configuration = _viewModel.configuration;
     if (configuration == null || _starting) return;
     setState(() => _starting = true);
+    await widget.settingsController?.playSound(AppSoundEffect.startMatch);
+    if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
             widget.boardBuilder?.call(configuration) ??
-            GameBoardScreen(configuration: configuration),
+            GameBoardScreen(
+              configuration: configuration,
+              preferences: widget.preferences,
+            ),
       ),
     );
     if (mounted) setState(() => _starting = false);
+  }
+
+  Future<void> _openSettings() async {
+    final controller = widget.settingsController;
+    if (controller == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(controller: controller),
+      ),
+    );
   }
 }
 
@@ -96,11 +144,13 @@ class _PhoneSetupLayout extends StatelessWidget {
     required this.viewModel,
     required this.starting,
     required this.onStartGame,
+    required this.onOpenSettings,
   });
 
   final MatchSetupViewModel viewModel;
   final bool starting;
   final VoidCallback onStartGame;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +158,7 @@ class _PhoneSetupLayout extends StatelessWidget {
       key: const Key('phone-setup-layout'),
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       children: <Widget>[
-        const _SetupIntroduction(),
+        _SetupIntroduction(onOpenSettings: onOpenSettings),
         const SizedBox(height: 24),
         _SetupCard(
           viewModel: viewModel,
@@ -125,11 +175,13 @@ class _TabletSetupLayout extends StatelessWidget {
     required this.viewModel,
     required this.starting,
     required this.onStartGame,
+    required this.onOpenSettings,
   });
 
   final MatchSetupViewModel viewModel;
   final bool starting;
   final VoidCallback onStartGame;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +194,12 @@ class _TabletSetupLayout extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              const Expanded(child: _SetupIntroduction(expanded: true)),
+              Expanded(
+                child: _SetupIntroduction(
+                  expanded: true,
+                  onOpenSettings: onOpenSettings,
+                ),
+              ),
               const SizedBox(width: 56),
               SizedBox(
                 width: 440,
@@ -161,9 +218,13 @@ class _TabletSetupLayout extends StatelessWidget {
 }
 
 class _SetupIntroduction extends StatelessWidget {
-  const _SetupIntroduction({this.expanded = false});
+  const _SetupIntroduction({
+    required this.onOpenSettings,
+    this.expanded = false,
+  });
 
   final bool expanded;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -171,22 +232,40 @@ class _SetupIntroduction extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            child: Text(
-              'MATCH SETUP',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: scheme.onSecondaryContainer,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.1,
+        Row(
+          children: <Widget>[
+            Flexible(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  child: Text(
+                    'MATCH SETUP',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: scheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              key: const Key('open-settings-button'),
+              tooltip: 'Settings',
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.settings_rounded),
+            ),
+          ],
         ),
         SizedBox(height: expanded ? 24 : 16),
         Semantics(
